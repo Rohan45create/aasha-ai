@@ -34,7 +34,7 @@ def initialize_firebase():
                 
     if db is None:
         try:
-            db = firestore.async_client()
+            db = firestore.AsyncClient()
         except ValueError:
             pass
 
