@@ -1,0 +1,1 @@
+import{n as e,t}from"./esm-CexSZI0U.js";t();var n=e((e,t)=>({user:null,role:null,isLoading:!0,setUser:t=>e({user:t}),setRole:t=>e({role:t}),setLoading:t=>e({isLoading:t}),get ashaId(){return t().user?.uid||null},get headId(){let{user:e,role:n}=t();return e&&(n===`asha_head`||n===`admin`)?e.uid:null}}));export{n as t};
