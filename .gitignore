@@ -1,3 +1,30 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node / JS
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Logs
+*.log
+firebase-debug.log
+
+# Project specific
 .agent
 .agents
 .gemini
