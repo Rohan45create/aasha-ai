@@ -1,0 +1,118 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================
+    // HELPER FUNCTIONS
+    // ==========================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function hasRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+    
+    function isASHA() { return hasRole('asha_worker'); }
+    function isHead() { return hasRole('asha_head'); }
+    function isAdmin() { return hasRole('admin'); }
+    
+    function isOwnData(ashaId) {
+      return isAuthenticated() && request.auth.uid == ashaId;
+    }
+    
+    function isHeadOf(ashaId) {
+      // Head can access data of their assigned ASHA workers
+      return isHead() && 
+             ashaId in get(/databases/$(database)/documents/asha_heads/$(request.auth.uid)).data.ashaIds;
+    }
+    
+    function isOwnerOrHead(ashaId) {
+      return isOwnData(ashaId) || isHeadOf(ashaId) || isAdmin();
+    }
+
+    // ==========================================
+    // ASHA WORKERS
+    // ==========================================
+    
+    match /ashas/{ashaId} {
+      allow read: if isOwnerOrHead(ashaId);
+      allow write: if isAdmin(); // Only admin creates/modifies worker accounts
+    }
+    
+    match /asha_heads/{headId} {
+      allow read: if isAuthenticated() && request.auth.uid == headId || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ==========================================
+    // SURVEY DATA (HOUSEHOLD / FAMILY)
+    // ==========================================
+    
+    match /households/{docId} {
+      allow read: if isOwnerOrHead(resource.data.ashaId);
+      allow create: if isASHA() && request.resource.data.ashaId == request.auth.uid;
+      allow update: if isOwnerOrHead(resource.data.ashaId);
+      // NO delete — data is permanent (soft delete only via isDeleted flag)
+      allow delete: if false;
+    }
+    
+    match /household_members/{docId} {
+      allow read: if isOwnerOrHead(resource.data.ashaId);
+      allow create: if isASHA() && request.resource.data.ashaId == request.auth.uid;
+      allow update: if isOwnerOrHead(resource.data.ashaId);
+      allow delete: if false;
+    }
+
+    // ==========================================
+    // HEALTH RECORDS (SENSITIVE)
+    // ==========================================
+    
+    match /pregnancies/{docId} {
+      allow read: if isOwnerOrHead(resource.data.ashaId);
+      allow create: if isASHA() && request.resource.data.ashaId == request.auth.uid;
+      allow update: if isOwnerOrHead(resource.data.ashaId);
+      allow delete: if false;
+    }
+    
+    match /children/{docId} {
+      allow read: if isOwnerOrHead(resource.data.ashaId);
+      allow create: if isASHA() && request.resource.data.ashaId == request.auth.uid;
+      allow update: if isOwnerOrHead(resource.data.ashaId);
+      allow delete: if false;
+    }
+    
+    // Same pattern for: disease_cases, ncd_records, birth_records, death_records
+    // death_records additionally require head acknowledgement before ASHA can mark complete
+
+    // ==========================================
+    // EDIT HISTORY — IMMUTABLE AUDIT TRAIL
+    // ==========================================
+    
+    match /edit_history/{docId} {
+      allow read: if isOwnerOrHead(request.auth.uid) || isAdmin();
+      allow create: if isAuthenticated(); // Any logged-in user can create
+      allow update: if false;  // NEVER modifiable
+      allow delete: if false;  // NEVER deletable
+    }
+    
+    // ==========================================
+    // SURVEY TEMPLATES (Admin creates, ASHA reads)
+    // ==========================================
+    
+    match /survey_templates/{docId} {
+      allow read: if isAuthenticated();           // All users can read templates
+      allow write: if isHead() || isAdmin();     // Only head/admin can create/modify
+    }
+    
+    // ==========================================
+    // RISK SCORES (Written by Cloud Function, Read by ASHA)
+    // ==========================================
+    
+    match /risk_scores/{docId} {
+      allow read: if isOwnerOrHead(resource.data.ashaId);
+      allow write: if false; // Only Cloud Function service account can write
+    }
+  }
+}

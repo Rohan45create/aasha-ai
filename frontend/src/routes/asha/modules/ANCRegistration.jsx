@@ -1,0 +1,35 @@
+import BaseModuleForm from '../../../components/BaseModuleForm';
+
+const FIELDS = [
+  { id: 'mother_name', label: 'Pregnant Woman Name / गर्भवती नाव', required: true, placeholder: 'Full name' },
+  { id: 'husband_name', label: 'Husband Name / पतीचे नाव', required: true, placeholder: 'Full name' },
+  { id: 'age', label: 'Age (years)', type: 'number', required: true },
+  { id: 'lmp_date', label: 'LMP Date / शेवटची मासिक पाळी', type: 'date', required: true },
+  { id: 'edd_date', label: 'Expected Delivery Date / अपेक्षित तारीख', type: 'date' },
+  { id: 'registration_date', label: 'Registration Date', type: 'date', required: true },
+  { id: 'gravida', label: 'Gravida (Total Pregnancies)', type: 'number', placeholder: '1' },
+  { id: 'para', label: 'Para (Deliveries)', type: 'number', placeholder: '0' },
+  { id: 'blood_group', label: 'Blood Group', type: 'select', options: [
+    { value: 'A+', label: 'A+' }, { value: 'A-', label: 'A-' },
+    { value: 'B+', label: 'B+' }, { value: 'B-', label: 'B-' },
+    { value: 'O+', label: 'O+' }, { value: 'O-', label: 'O-' },
+    { value: 'AB+', label: 'AB+' }, { value: 'AB-', label: 'AB-' },
+    { value: 'Unknown', label: 'Unknown' }
+  ]},
+  { id: 'weight_kg', label: 'Weight (kg)', type: 'number', placeholder: 'e.g. 55' },
+  { id: 'bp_systolic', label: 'BP Systolic', type: 'number', placeholder: 'e.g. 120' },
+  { id: 'bp_diastolic', label: 'BP Diastolic', type: 'number', placeholder: 'e.g. 80' },
+  { id: 'hemoglobin', label: 'Hemoglobin (g/dL)', type: 'number', placeholder: 'e.g. 11.5' },
+  { id: 'high_risk_factors', label: 'High Risk Factors (if any)', type: 'textarea', placeholder: 'Previous cesarean, hypertension, anaemia, etc.' },
+  { id: 'ifa_tablets_given', label: 'IFA Tablets Given', type: 'checkbox', checkboxLabel: 'IFA tablets provided' },
+];
+
+export default function ANCRegistration() {
+  return <BaseModuleForm 
+    title="ANC Registration / गर्भवती नोंदणी" 
+    moduleIcon="pregnant_woman" 
+    collectionName="pregnancies"
+    moduleName="anc"
+    fields={FIELDS}
+  />;
+}

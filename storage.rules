@@ -1,0 +1,24 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // OCR register photos — ASHA can only upload, no read after processing
+    match /registers/{ashaId}/{filename} {
+      allow write: if request.auth.uid == ashaId;
+      allow read: if request.auth.uid == ashaId  // Only uploader can read
+                  || request.auth.token.role == 'admin';
+    }
+    
+    // Child malnutrition photos — ASHA who uploaded + head
+    match /malnutrition/{ashaId}/{childId}/{filename} {
+      allow write: if request.auth.uid == ashaId;
+      allow read: if request.auth.uid == ashaId
+                  || (request.auth.token.role == 'asha_head' && ashaId in get(/databases/$(database)/documents/asha_heads/$(request.auth.uid)).data.ashaIds);
+    }
+    
+    // No other paths accessible
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
