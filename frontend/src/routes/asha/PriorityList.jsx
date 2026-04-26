@@ -1,151 +1,166 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuthStore } from '../../stores/authStore';
+import { getAuth } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
+import { db } from '../../firebase';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 
-export default function PriorityList() {
-  const { ashaId, user } = useAuthStore();
-  const navigate = useNavigate();
+const PriorityList = () => {
   const [items, setItems] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCalculating, setIsCalculating] = useState(false);
-  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [calculating, setCalculating] = useState(false);
+  const [source, setSource] = useState(''); // 'api' or 'firestore'
+  const auth = getAuth();
+  const navigate = useNavigate();
+  const { ashaId: storeAshaId } = useAuthStore();
 
-  const fetchPriorityList = async () => {
-    if (!ashaId || !user) return;
-    setIsLoading(true);
+  const hasAutoTriggered = useRef(false);
+
+  const getAshaId = () => {
+    const id = storeAshaId || localStorage.getItem('ashaId') || auth.currentUser?.uid;
+    console.log('[PriorityList] Using ashaId:', id);
+    return id;
+  };
+
+  // Fallback: load directly from Firestore children collection
+  const loadFromFirestore = async (ashaId) => {
     try {
-      const token = await user.getIdToken();
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/risk/priority/${ashaId}`, {
-        headers: { "Authorization": `Bearer ${token}` }
+      const snap = await getDocs(
+        query(collection(db, 'children'), where('ashaId', '==', ashaId))
+      );
+      if (snap.empty) return [];
+      const children = snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          name: data.name || 'Unknown',
+          risk_level: data.riskLevel || 'LOW',
+          risk_score: data.riskScore || 0,
+          age_months: data.ageMonths || 0,
+          type: 'child',
+          primary_driver: data.riskPrimaryDriver || '',
+          recommended_action: data.riskRecommendedAction || '',
+        };
       });
-      if (!res.ok) throw new Error("Failed to fetch priority list");
-      const data = await res.json();
-      setItems(data);
-    } catch (err) {
-      console.error(err);
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
+      // Sort by riskScore descending (client-side, no composite index needed)
+      children.sort((a, b) => b.risk_score - a.risk_score);
+      return children.filter(c => ['CRITICAL', 'HIGH', 'MEDIUM'].includes(c.risk_level));
+    } catch (e) {
+      console.error('[PriorityList] Firestore fallback error:', e);
+      return [];
     }
   };
 
-  useEffect(() => {
-    fetchPriorityList();
-  }, [ashaId, user]);
+  const fetchPriority = async () => {
+    setLoading(true);
+    const ashaId = getAshaId();
+    if (!ashaId) { setLoading(false); return; }
 
-  const handleCalculateNow = async () => {
-    if (!ashaId || !user) return;
-    setIsCalculating(true);
     try {
-      const token = await user.getIdToken();
+      const token = await auth.currentUser?.getIdToken();
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/risk/priority/${ashaId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      const data = await res.json();
+
+      if (data.length > 0) {
+        setItems(data);
+        setSource('api');
+      } else {
+        // API returned empty — fall back to Firestore
+        const fsData = await loadFromFirestore(ashaId);
+        setItems(fsData);
+        setSource('firestore');
+        if (fsData.length === 0 && !hasAutoTriggered.current) {
+          hasAutoTriggered.current = true;
+          triggerCalculation();
+        }
+      }
+    } catch (e) {
+      console.warn('[PriorityList] Backend unavailable, using Firestore:', e.message);
+      const fsData = await loadFromFirestore(ashaId);
+      setItems(fsData);
+      setSource('firestore');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const triggerCalculation = async () => {
+    setCalculating(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const ashaId = getAshaId();
+      if (!ashaId) return;
       const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/risk/calculate-now/${ashaId}`, {
         method: 'POST',
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error("Failed to calculate risk");
-      await fetchPriorityList();
-    } catch (err) {
-      console.error(err);
-      setError(err.message);
+      if (res.ok) {
+        await fetchPriority();
+      }
+    } catch (e) {
+      console.error('[PriorityList] Calculation failed:', e);
     } finally {
-      setIsCalculating(false);
+      setCalculating(false);
     }
   };
 
-  const getBorderColor = (level) => {
-    const map = {
-      "CRITICAL": "border-l-red-500",
-      "HIGH": "border-l-orange-500",
-      "MEDIUM": "border-l-yellow-400",
-      "LOW": "border-l-green-500"
-    };
-    return map[level] || "border-l-gray-300";
+  useEffect(() => { fetchPriority(); }, [storeAshaId]);
+
+
+
+  const RISK_CONFIG = {
+    CRITICAL: { color: '#E24B4A', bg: '#FCEBEB', dot: '🔴', label: 'CRITICAL' },
+    HIGH:     { color: '#BA7517', bg: '#FAEEDA', dot: '🟡', label: 'HIGH' },
+    MEDIUM:   { color: '#185FA5', bg: '#E6F1FB', dot: '🔵', label: 'MEDIUM' },
+    LOW:      { color: '#27500A', bg: '#EAF3DE', dot: '🟢', label: 'LOW' },
   };
 
-  const getCardBg = (level) => {
-    const map = {
-      "CRITICAL": "bg-red-50",
-      "HIGH": "bg-orange-50",
-      "MEDIUM": "bg-yellow-50",
-      "LOW": "bg-green-50"
-    };
-    return map[level] || "bg-white";
-  };
+  if (loading) return <div style={{padding:'20px',textAlign:'center'}}>Loading priority list...</div>;
 
   return (
-    <div className="pb-24 p-4 min-h-screen bg-gray-50">
-      <div className="flex items-center space-x-3 mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-200">
-        <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600">
-          <span className="material-symbols-outlined text-2xl">priority_high</span>
-        </div>
+    <div style={{padding:'16px'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Priority Tasks</h2>
-          <p className="text-sm text-gray-500">AI-driven visit schedule</p>
+          <h2 style={{fontSize:'18px',fontWeight:'600'}}>Today's Priority Visits</h2>
+          {source && <p style={{fontSize:'10px',color:'#888',marginTop:'2px'}}>{source === 'firestore' ? '📦 From Firestore (direct)' : '🤖 From Risk Engine'}</p>}
         </div>
+        <button onClick={fetchPriority} disabled={calculating || loading} style={{fontSize:'12px',padding:'6px 12px',background:'#1D9E75',color:'white',border:'none',borderRadius:'6px',cursor:'pointer'}}>
+          {calculating ? '⏳ Calculating...' : '🔄 Refresh'}
+        </button>
       </div>
 
-      {error && (
-        <div className="p-4 bg-red-100 border border-red-300 text-red-800 rounded-xl mb-4">
-          Failed to load: {error}
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="flex justify-center p-8">
-          <span className="material-symbols-outlined animate-spin text-4xl text-[#1D9E75]">refresh</span>
-        </div>
-      ) : items.length === 0 ? (
-        <div className="bg-white p-8 rounded-2xl shadow-sm text-center border border-gray-200 flex flex-col items-center">
-          <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">fact_check</span>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">No Priority Data Found</h3>
-          <p className="text-gray-500 mb-6">Run the AI risk engine to calculate risk scores for your assigned cases.</p>
-          <button 
-            onClick={handleCalculateNow} 
-            disabled={isCalculating}
-            className="px-6 py-3 bg-[#1D9E75] text-white rounded-xl font-bold hover:bg-[#16815e] disabled:opacity-50 flex items-center gap-2"
-          >
-            {isCalculating ? <span className="material-symbols-outlined animate-spin">refresh</span> : 'Run Risk Calculation Now'}
+      {items.length === 0 ? (
+        <div style={{textAlign:'center',padding:'40px 20px',color:'#666'}}>
+          <p>No priority data yet.</p>
+          <p style={{fontSize:'12px',color:'#888',marginTop:'8px'}}>Using ashaId: {getAshaId()}</p>
+          <button onClick={triggerCalculation} disabled={calculating} style={{marginTop:'12px',padding:'10px 20px',background:'#1D9E75',color:'white',border:'none',borderRadius:'8px',cursor:calculating?'not-allowed':'pointer',opacity:calculating?0.6:1}}>
+            {calculating ? '⏳ Calculating...' : 'Calculate Risk Scores Now'}
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="flex justify-end">
-             <button onClick={handleCalculateNow} disabled={isCalculating} className="text-sm font-medium text-[#1D9E75] flex items-center gap-1 hover:underline">
-               <span className={`material-symbols-outlined text-sm ${isCalculating?'animate-spin':''}`}>refresh</span>
-               Recalculate
-             </button>
-          </div>
-          {items.map((item) => (
-            <div key={item.id} className={`rounded-xl shadow-sm border-2 border-transparent border-l-4 ${getBorderColor(item.risk_level)} ${getCardBg(item.risk_level)} overflow-hidden`}>
-              <div className="p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        items.map(item => {
+          const cfg = RISK_CONFIG[item.risk_level] || RISK_CONFIG.LOW;
+          return (
+            <div key={item.id} style={{background:cfg.bg,borderLeft:`4px solid ${cfg.color}`,borderRadius:'8px',padding:'12px 14px',marginBottom:'10px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                     <span className={`text-xs font-bold px-2 py-1 rounded border uppercase tracking-wider ${
-                        item.type === 'child' ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-purple-100 text-purple-800 border-purple-200'
-                     }`}>
-                        {item.type}
-                     </span>
-                     <span className="text-xs font-bold text-gray-500">Score: {item.risk_score}/100</span>
-                  </div>
-                  <h3 className="text-lg font-bold text-gray-900">{item.name || 'Unknown'}</h3>
-                  {item.age_months !== undefined && <p className="text-sm text-gray-600 font-medium">Age: {item.age_months} months</p>}
-                  
-                  <div className="mt-3 bg-white/60 p-3 rounded-lg border border-black/5">
-                    <p className="text-sm font-medium text-gray-900 mb-1"><span className="text-red-600 font-bold">Driver:</span> {item.primary_driver}</p>
-                    <p className="text-sm text-gray-700"><strong>Action:</strong> {item.recommended_action}</p>
-                  </div>
+                  <p style={{fontWeight:'600',fontSize:'15px',color:'#1a1a1a'}}>{cfg.dot} {item.name}</p>
+                  <p style={{fontSize:'12px',color:'#555',marginTop:'2px'}}>
+                    {item.type === 'child' ? `${item.age_months} months` : 'Pregnancy'} · Score: {item.risk_score}/100
+                  </p>
+                  <p style={{fontSize:'12px',color:cfg.color,marginTop:'4px',fontWeight:'500'}}>{item.primary_driver}</p>
+                  <p style={{fontSize:'11px',color:'#666',marginTop:'2px'}}>→ {item.recommended_action}</p>
                 </div>
-                <button 
-                  onClick={() => navigate(item.type === 'child' ? `/asha/child-growth` : `/asha/anc`)}
-                  className="w-full sm:w-auto px-6 py-3 bg-white border border-gray-300 shadow-sm text-gray-900 font-bold rounded-xl hover:bg-gray-50 active:scale-95"
-                >
-                  Visit
-                </button>
+                <span style={{background:cfg.color,color:'white',fontSize:'10px',padding:'2px 8px',borderRadius:'10px',fontWeight:'600'}}>{cfg.label}</span>
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })
       )}
     </div>
   );
-}
+};
+export default PriorityList;

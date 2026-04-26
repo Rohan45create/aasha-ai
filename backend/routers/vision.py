@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from google.cloud import storage as gcs
 import structlog
 import uuid
@@ -12,9 +12,12 @@ router = APIRouter(prefix="/api/vision", tags=["Vision & OCR"])
 STORAGE_BUCKET = os.getenv("GCS_BUCKET", "ashaai-health-photos")
 
 
+from middleware.auth_middleware import verify_firebase_token
+
 @router.post("/muac-grade")
 async def grade_muac_photo(
     photo: UploadFile = File(...),
+    user=Depends(verify_firebase_token)
 ):
     """
     Camera malnutrition grading via Gemini Vision.
@@ -63,7 +66,7 @@ class ExtractRequest(BaseModel):
     asha_id: str
 
 @router.post("/register/extract")
-async def extract_register_photo(req: ExtractRequest):
+async def extract_register_photo(req: ExtractRequest, user=Depends(verify_firebase_token)):
     """
     Register OCR pipeline:
     1. ASHA uploads photo direct to Firebase Storage

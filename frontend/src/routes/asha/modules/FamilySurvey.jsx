@@ -5,7 +5,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import { addHousehold, addMember } from '../../../utils/firestore';
 import { useNavigate } from 'react-router-dom';
 import AmbientToggle from '../../../components/AmbientToggle';
-import VoiceAssistantOverlay from '../../../components/VoiceAssistantOverlay';
+import VoiceOverlay from '../../../components/VoiceOverlay';
 
 async function hashAadhaar(aadhaarString) {
   if (!aadhaarString) return null;
@@ -33,6 +33,7 @@ export default React.memo(function FamilySurvey() {
   const [toast, setToast] = useState(null);
   const [duplicateModal, setDuplicateModal] = useState({ show: false, existingRecord: null, memberIndex: null });
   const [voiceFilledFields, setVoiceFilledFields] = useState({});
+  const [showVoice, setShowVoice] = useState(false);
 
   const showToast = (message, type = 'info') => {
     setToast({ message, type });
@@ -144,15 +145,8 @@ export default React.memo(function FamilySurvey() {
       }, ashaId);
 
       for (const m of members) {
-        // Assume aadhaar_raw will be encrypted on the backend, for now we save the hash explicitly
         let aadhaarHash = m.aadhaarHash;
         if (m.aadhaar_raw && !aadhaarHash) aadhaarHash = await hashAadhaar(m.aadhaar_raw);
-
-        // We must prepare payload. Currently `addMember` doesn't do AES-256-GCM. 
-        // We will send aadhaarEncrypted as hash for now or rely on a new backend endpoint.
-        // User requested: "Backend encrypts with AES-256-GCM before Firestore write" - but we're writing to Firestore here.
-        // Let's adhere to `addMember` existing signature, just pass hash and raw values and let the system handle it, 
-        // or a future backend migration will do the encrypt.
 
         await addMember({
           householdId,
@@ -163,13 +157,13 @@ export default React.memo(function FamilySurvey() {
           age: parseInt(m.age) || null,
           relationshipToHead: m.relationship_to_head,
           maritalStatus: m.marital_status || null,
-          aadhaarEncrypted: m.aadhaar_raw ? m.aadhaar_raw : null, // Assuming backend intercepts or direct save for this exercise
+          aadhaarEncrypted: m.aadhaar_raw ? m.aadhaar_raw : null, 
           aadhaarHash: aadhaarHash,
           temporaryId: m.temporaryId || null,
           mobileNumber: m.mobile_number || null,
           abhaId: m.abha_id || null,
           source: 'manual',
-          existingId: m.existingId // if updating
+          existingId: m.existingId
         }, ashaId);
       }
 
@@ -184,6 +178,7 @@ export default React.memo(function FamilySurvey() {
   };
   
   const handleVoiceData = (structuredData) => {
+    if (!structuredData) return;
     setMembers((prev) => {
       const copy = [...prev];
       const targetIndex = expandedMember === -1 ? 0 : expandedMember;
@@ -202,12 +197,13 @@ export default React.memo(function FamilySurvey() {
       }));
       return copy;
     });
-    showToast('✓ Voice filled', 'success');
+    setShowVoice(false);
+    showToast('Voice data applied successfully', 'success');
   };
 
   const getVoiceTag = (memberId, field) => {
     if (voiceFilledFields[memberId]?.includes(field)) {
-      return <span className="text-xs text-[#1D9E75] font-medium mt-1 flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">mic</span> Voice filled</span>;
+      return <span className="text-xs text-[#1D9E75] font-bold px-2 py-0.5 bg-[#EAF3DE] rounded border border-[#1D9E75] mt-1 inline-block">🎤 Voice filled</span>;
     }
     return null;
   };
@@ -238,7 +234,7 @@ export default React.memo(function FamilySurvey() {
       noAadhaar: false, temporaryId: '',
       voiceFilled: [], isDuplicate: false, existingId: null
     }]);
-    setExpandedMember(members.length); // auto expand the new one
+    setExpandedMember(members.length);
   };
 
   if (memberCount === null) {
@@ -307,7 +303,6 @@ export default React.memo(function FamilySurvey() {
     );
   }
 
-  // Calculate completeness
   const isMemberComplete = (m) => m.member_name && m.gender && (m.date_of_birth || m.age);
   const completeCount = members.filter(isMemberComplete).length;
   const isAllComplete = completeCount === members.length && household.house_number;
@@ -342,7 +337,6 @@ export default React.memo(function FamilySurvey() {
           const complete = isMemberComplete(member);
           return (
             <div key={member.id} className={`bg-white rounded-2xl shadow-sm border overflow-hidden ${complete ? 'border-[#1D9E75]' : 'border-[#D3D1C7]'}`}>
-              {/* Accordion Header */}
               <div 
                 className={`w-full p-4 flex items-center justify-between ${isExpanded ? 'bg-[#EAF3DE]/30' : 'hover:bg-gray-50'}`}
               >
@@ -367,10 +361,8 @@ export default React.memo(function FamilySurvey() {
                 </div>
               </div>
 
-              {/* Accordion Body */}
               {isExpanded && (
                 <div className="p-4 space-y-5 border-t border-[#D3D1C7]">
-                  {/* Aadhaar Section */}
                   <div>
                     {!member.noAadhaar && (
                       <AadhaarInput 
@@ -458,9 +450,9 @@ export default React.memo(function FamilySurvey() {
           <span className="text-2xl leading-none">+</span> Add Another Member
         </button>
 
-        <div className="h-8"></div> {/* Spacer */}
+        <div className="h-8"></div>
 
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-[#D3D1C7] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-[#D3D1C7] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30">
            <div className="flex flex-col space-y-2 max-w-lg mx-auto">
              <div className="flex justify-between text-sm font-medium">
                 <span className="text-gray-600">Progress</span>
@@ -486,7 +478,22 @@ export default React.memo(function FamilySurvey() {
         </div>
       </form>
       
-      <VoiceAssistantOverlay moduleType="family_survey" onDataReceived={handleVoiceData} />
+      <button
+        type="button"
+        onClick={() => setShowVoice(true)}
+        style={{ position: 'fixed', bottom: '100px', right: '20px' }}
+        className="w-[72px] h-[72px] bg-[#1D9E75] text-white rounded-full flex items-center justify-center shadow-[0_8px_30px_rgba(29,158,117,0.3)] hover:scale-105 active:scale-95 transition-transform z-40"
+      >
+        <span className="material-symbols-outlined text-4xl">mic</span>
+      </button>
+
+      {showVoice && (
+        <VoiceOverlay 
+          moduleType="family_survey" 
+          onFieldsFilled={handleVoiceData} 
+          onClose={() => setShowVoice(false)}
+        />
+      )}
     </div>
   );
 });

@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
 import BaseModuleForm from '../../../components/BaseModuleForm';
 import { useAuthStore } from '../../../stores/authStore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../../firebase';
 
 const FIELDS = [
   { id: 'child_name', label: 'Child Name / बालकाचे नाव', required: true, placeholder: 'Full name' },
@@ -76,6 +78,7 @@ export default function ChildGrowth() {
       
       const data = await response.json();
       setGradeResult(data);
+      
       // Auto-prefill the "malnutritionGrade" field using the suggested structure logic
       // Note: BaseModuleForm will overwrite if we provide `initialData` or we can just 
       // let the user see it and pick it manually, or we could lift the state up.
@@ -85,6 +88,51 @@ export default function ChildGrowth() {
       setGradeResult({ error: true, grade: 'ERROR', confidence: 0 });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateReferral = async () => {
+    if (!user) return;
+    try {
+      const childId = 'temp_' + Date.now();
+      const childName = prefillData?.child_name || 'Unknown Child';
+
+      // Auto-create referral
+      await addDoc(collection(db, 'referrals'), {
+        childId, 
+        childName,
+        ashaId: user.uid,
+        status: 'Pending',
+        referredDate: new Date().toISOString().split('T')[0],
+        nrcName: 'District Hospital Beed NRC',
+        reason: 'Severe Acute Malnutrition — MUAC < 115mm',
+        createdAt: serverTimestamp()
+      });
+
+      // Create pending_review for head
+      await addDoc(collection(db, 'pending_reviews'), {
+        title: `SAM: ${childName} — Immediate NRC referral`,
+        ashaId: user.uid, 
+        linkedCollection: 'children', 
+        linkedDocId: childId,
+        reviewStatus: 'pending', 
+        createdAt: serverTimestamp()
+      });
+
+      // Notification for head
+      await addDoc(collection(db, 'notifications'), {
+        userId: 'head_sunita_001',
+        title: `🚨 CRITICAL: ${childName}`,
+        message: `SAM detected. NRC referral created. ASHA: ${user.displayName || 'ASHA'}`,
+        type: 'critical_alert', 
+        isRead: false, 
+        createdAt: serverTimestamp()
+      });
+
+      alert("Referral generated successfully! Notifications sent to Medical Officer.");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to generate referral.");
     }
   };
 
@@ -111,6 +159,15 @@ export default function ChildGrowth() {
             <p className="text-sm mt-1">Confidence: {gradeResult.confidence}%</p>
             {gradeResult.error && <p className="text-xs mt-1 text-red-500">Failed to analyze image.</p>}
             <button onClick={clearPhoto} className="mt-3 text-xs underline font-medium">Scan Again</button>
+            
+            {(gradeResult.grade === 'SAM' || gradeResult.grade === 'RED') && (
+              <button 
+                onClick={handleGenerateReferral}
+                className="mt-4 w-full py-3 bg-[#E24B4A] text-white rounded-xl shadow-md font-bold text-sm flex justify-center items-center gap-2 active:scale-[0.98] transition-transform"
+              >
+                Generate NRC Referral &rarr;
+              </button>
+            )}
           </div>
         ) : preview ? (
           <div className="relative">
@@ -140,6 +197,7 @@ export default function ChildGrowth() {
         collectionName="children"
         moduleName="child_growth"
         fields={FIELDS}
+        onFormChange={setPrefillData}
       />
     </div>
   );

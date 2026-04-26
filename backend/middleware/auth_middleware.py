@@ -9,6 +9,22 @@ security = HTTPBearer()
 def verify_firebase_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
     try:
         decoded_token = auth.verify_id_token(credentials.credentials)
+        
+        # Fallback for seeded users who don't have custom claims yet
+        if not decoded_token.get("role"):
+            from firebase_admin import firestore
+            db = firestore.client()
+            email = decoded_token.get("email")
+            if email:
+                head_docs = list(db.collection("asha_heads").where("email", "==", email).limit(1).stream())
+                if head_docs:
+                    decoded_token["role"] = "asha_head"
+                else:
+                    # Check if they are an ASHA worker
+                    asha_docs = list(db.collection("ashas").where("phone", "==", decoded_token.get("phone_number")).limit(1).stream())
+                    if asha_docs:
+                        decoded_token["role"] = "asha_worker"
+        
         return decoded_token
     except Exception as e:
         logger.error("invalid_token_error", error=str(e))

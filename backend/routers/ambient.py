@@ -1,4 +1,4 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from firebase_admin import auth as firebase_auth
 import structlog
 import json
@@ -103,8 +103,10 @@ class AskRequest(BaseModel):
     query: str
     language: str = "en"
 
+from middleware.auth_middleware import verify_firebase_token
+
 @router.post("/api/ambient/ask")
-async def ask_asha_ai(request: AskRequest):
+async def ask_asha_ai(request: AskRequest, user=Depends(verify_firebase_token)):
     """
     Handle generic queries from AskAshaAI chat interface.
     """

@@ -2,25 +2,55 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/authStore';
-import { subscribeToASHAStats } from '../../utils/firestore';
+import { db } from '../../firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 export default React.memo(function Home() {
   const { t } = useTranslation();
-  const { user } = useAuthStore();
-  const [stats, setStats] = useState({ families: 0, highRisk: 0, pendingVisits: 0, visits: 0 });
+  const { user, ashaId: storeAshaId } = useAuthStore();
+  const [stats, setStats] = useState({ families: 0, highRisk: 0, pendingVisits: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.uid) { setLoading(false); return; }
-    const unsub = subscribeToASHAStats(user.uid, (data) => {
-      setStats(prev => ({
-        ...prev,
-        ...data,
-      }));
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [user]);
+    const ashaId = storeAshaId || localStorage.getItem('ashaId') || user?.uid;
+    if (!ashaId) { setLoading(false); return; }
+    console.log('[Home] Using ashaId:', ashaId);
+
+    let loaded = { families: false, children: false, pregnancies: false };
+    const markLoaded = (key) => {
+      loaded[key] = true;
+      if (Object.values(loaded).every(Boolean)) setLoading(false);
+    };
+
+    // Families — simple single-where query, no index needed
+    const unsubFamilies = onSnapshot(
+      query(collection(db, 'households'), where('ashaId', '==', ashaId)),
+      snap => { setStats(s => ({ ...s, families: snap.size })); markLoaded('families'); },
+      err => { console.warn('[Home] households error', err.code); markLoaded('families'); }
+    );
+
+    // Children — single where, filter HIGH+CRITICAL client-side
+    const unsubChildren = onSnapshot(
+      query(collection(db, 'children'), where('ashaId', '==', ashaId)),
+      snap => {
+        const highRisk = snap.docs.filter(d => ['HIGH', 'CRITICAL'].includes(d.data().riskLevel)).length;
+        setStats(s => ({ ...s, highRisk }));
+        markLoaded('children');
+      },
+      err => { console.warn('[Home] children error', err.code); markLoaded('children'); }
+    );
+
+    // Pregnancies — use as "pending visits" proxy (ANC follow-ups)
+    const unsubPreg = onSnapshot(
+      query(collection(db, 'pregnancies'), where('ashaId', '==', ashaId)),
+      snap => { setStats(s => ({ ...s, pendingVisits: snap.size })); markLoaded('pregnancies'); },
+      err => { console.warn('[Home] pregnancies error', err.code); markLoaded('pregnancies'); }
+    );
+
+    return () => { unsubFamilies(); unsubChildren(); unsubPreg(); };
+  }, [storeAshaId, user]);
+
+
 
   const modules = [
     { title: t('family_survey'), path: '/asha/family-survey', icon: 'family_home', color: 'bg-[#EAF3DE] text-[#085041]' },

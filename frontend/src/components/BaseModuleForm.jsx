@@ -3,11 +3,11 @@ import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
-import useVoiceRecorder from '../hooks/useVoiceRecorder';
+import VoiceOverlay from './VoiceOverlay';
 import AmbientToggle from './AmbientToggle';
 
-export default function BaseModuleForm({ title, moduleIcon, collectionName, fields, moduleName, onSubmit }) {
-  const { user } = useAuthStore();
+export default function BaseModuleForm({ title, moduleIcon, collectionName, fields, moduleName, onSubmit, onFormChange }) {
+  const { user, ashaId: storeAshaId } = useAuthStore();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -16,8 +16,7 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
 
   // Voice integration
   const voiceModule = moduleName || collectionName || 'family_survey';
-  const { isRecording, isProcessing, transcript, structuredData, startRecording, stopRecording, setStructuredData } = useVoiceRecorder(voiceModule);
-
+  const [showVoice, setShowVoice] = useState(false);
   const [voiceFilledFields, setVoiceFilledFields] = useState([]);
 
   const showToast = useCallback((message, type = 'info') => {
@@ -25,8 +24,7 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  // Auto-fill form when voice returns structured data
-  useEffect(() => {
+  const handleVoiceFilled = (structuredData) => {
     if (structuredData && typeof structuredData === 'object') {
       const newFilledFields = [];
       setFormData(prev => {
@@ -40,10 +38,9 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
         return merged;
       });
       setVoiceFilledFields(prev => [...new Set([...prev, ...newFilledFields])]);
-      setStructuredData(null);
       showToast('Voice data applied to form', 'success');
     }
-  }, [structuredData, setStructuredData, showToast]);
+  };
 
   const validate = () => {
     const newErrors = {};
@@ -63,6 +60,8 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
       showToast('Please fill all required fields', 'error');
       return;
     }
+    // Use the resolved Firestore doc ID (e.g. 'asha_lata_001'), not Firebase Auth UID
+    const resolvedAshaId = storeAshaId || localStorage.getItem('ashaId') || user?.uid;
     setIsLoading(true);
     try {
       if (onSubmit) {
@@ -70,7 +69,7 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
       } else {
         const docRef = await addDoc(collection(db, collectionName), {
           ...formData,
-          ashaId: user.uid,
+          ashaId: resolvedAshaId,
           source: 'manual',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -81,7 +80,7 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
           documentId: docRef.id,
           action: 'create',
           data: JSON.stringify(formData),
-          ashaId: user.uid,
+          ashaId: resolvedAshaId,
           timestamp: serverTimestamp(),
         });
       }
@@ -97,7 +96,11 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
 
   const handleChange = (e, fieldId) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setFormData(prev => ({ ...prev, [fieldId]: value }));
+    setFormData(prev => {
+      const next = { ...prev, [fieldId]: value };
+      if (onFormChange) onFormChange(next);
+      return next;
+    });
     // Clear error on change
     if (errors[fieldId]) {
       setErrors(prev => { const n = { ...prev }; delete n[fieldId]; return n; });
@@ -136,20 +139,13 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
         <AmbientToggle module={voiceModule} onAcceptSuggestion={handleAmbientSuggestion} />
       </div>
 
-      {/* Voice transcript banner */}
-      {transcript && (
-        <div className="mb-4 p-3 bg-[#F3E5F5] rounded-xl text-sm text-[#6A1B9A] border border-[#CE93D8]">
-          <span className="font-medium">🎤 Transcript: </span>{transcript}
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-4">
         {fields.map(field => (
           <div key={field.id}>
             <label className="block text-sm font-medium mb-1 text-[#5F5E5A]">
               {field.label}
               {field.required && <span className="text-[#E24B4A] ml-1">*</span>}
-              {voiceFilledFields.includes(field.id) && <span className="ml-2 text-xs text-[#1D9E75] font-bold px-2 py-0.5 bg-[#EAF3DE] rounded border border-[#1D9E75]">✓ Voice filled</span>}
+              {voiceFilledFields.includes(field.id) && <span className="ml-2 text-xs text-[#1D9E75] font-bold px-2 py-0.5 bg-[#EAF3DE] rounded border border-[#1D9E75]">🎤 Voice filled</span>}
             </label>
             {field.type === 'select' ? (
               <select
@@ -203,25 +199,8 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
           </div>
         ))}
 
-        {/* Voice + Action buttons */}
+        {/* Action buttons */}
         <div className="pt-4 space-y-3">
-          {/* Mic button */}
-          <button
-            type="button"
-            onClick={isRecording ? stopRecording : startRecording}
-            disabled={isProcessing}
-            className={`w-full py-3 rounded-xl font-medium text-center flex justify-center items-center gap-2 transition-all ${
-              isRecording ? 'bg-red-500 text-white animate-pulse' :
-              isProcessing ? 'bg-gray-200 text-gray-500' :
-              'bg-[#F3E5F5] text-[#6A1B9A] border border-[#CE93D8] hover:bg-[#E1BEE7]'
-            }`}
-          >
-            <span className="material-symbols-outlined">
-              {isProcessing ? 'refresh' : isRecording ? 'stop' : 'mic'}
-            </span>
-            {isProcessing ? 'Processing voice...' : isRecording ? 'Stop Recording' : 'Voice Input'}
-          </button>
-
           {/* Submit + Cancel */}
           <div className="flex space-x-3">
             <button type="button" onClick={() => navigate(-1)} className="flex-1 py-3 border border-[#D3D1C7] text-[#5F5E5A] rounded-xl font-medium text-center hover:bg-gray-50 flex justify-center items-center">
@@ -233,6 +212,26 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
           </div>
         </div>
       </form>
+
+      {/* Floating Voice Mic Button */}
+      <button
+        type="button"
+        onClick={() => setShowVoice(true)}
+        style={{ position: 'fixed', bottom: '80px', right: '20px' }}
+        className="w-[72px] h-[72px] bg-[#1D9E75] text-white rounded-full flex items-center justify-center shadow-lg z-40 hover:scale-105 transition-transform"
+      >
+        <span className="material-symbols-outlined text-4xl">mic</span>
+      </button>
+
+      {showVoice && (
+        <VoiceOverlay 
+          moduleType={voiceModule} 
+          formFields={fields}
+          onFieldsFilled={handleVoiceFilled} 
+          onClose={() => setShowVoice(false)} 
+        />
+      )}
+
     </div>
   );
 }

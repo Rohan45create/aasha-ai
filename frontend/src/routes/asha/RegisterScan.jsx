@@ -1,209 +1,278 @@
 import { useState, useRef } from 'react';
-import { useAuthStore } from '../../stores/authStore';
-import { db, storage } from '../../firebase';
+import { getStorage, ref, uploadBytes } from 'firebase/storage';
+import { getAuth } from 'firebase/auth';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes } from 'firebase/storage';
-import { compressImage } from '../../utils/imageCompressor';
+import { db } from '../../firebase';
+import { useAuthStore } from '../../stores/authStore';
 
-export default function RegisterScan() {
-  const [photo, setPhoto] = useState(null);
-  const [preview, setPreview] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const fileInputRef = useRef();
-  const { user } = useAuthStore();
+const RegisterScan = () => {
+  // step: upload | uploading | processing | review | saving | done | error
+  const [step, setStep] = useState('upload');
+  const [rows, setRows] = useState([]);
+  const [totalFound, setTotalFound] = useState(0);
+  const [registerType, setRegisterType] = useState('family_survey');
+  const [storagePath, setStoragePath] = useState('');
+  const [error, setError] = useState('');
+  const [editingRow, setEditingRow] = useState(null);
+  const fileInputRef = useRef(null);
+  const auth = getAuth();
+  const storage = getStorage();
+  const { ashaId: storeAshaId } = useAuthStore();
 
-  const handleCapture = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setPhoto(file);
-      setPreview(URL.createObjectURL(file));
-      setResult(null);
-    }
-  };
+  const getAshaId = () => storeAshaId || localStorage.getItem('ashaId') || auth.currentUser?.uid;
 
-  const clearPhoto = () => {
-    setPhoto(null);
-    setPreview(null);
-    setResult(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }
+  const compressImage = (file) => new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, Math.sqrt((1024 * 1024) / file.size));
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error('Image compression failed'));
+      }, 'image/jpeg', 0.85);
+    };
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = URL.createObjectURL(file);
+  });
 
-  const handleUpload = async () => {
-    if (!photo || !user) return;
-    setIsLoading(true);
+  const handleFileSelect = async (file) => {
+    if (!file) return;
+    setError('');
+    setStep('uploading');
+    console.log('[RegisterScan] Step: uploading');
+
+    let path = '';
     try {
-       // Compress photo
-       const compressedBlob = await compressImage(photo);
-       const compressed = new File([compressedBlob], photo.name, { type: 'image/jpeg', lastModified: Date.now() });
-       
-       // Upload to firebase storage
-       const timestamp = Date.now();
-       const storagePath = `registers/${user.uid}/${timestamp}.jpg`;
-       const storageRef = ref(storage, storagePath);
-       await uploadBytes(storageRef, compressed);
-
-       // Call backend
-       const token = await user.getIdToken();
-       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/register/extract`, {
-         method: "POST",
-         headers: { 
-           "Authorization": `Bearer ${token}`,
-           "Content-Type": "application/json"
-         },
-         body: JSON.stringify({
-           storage_path: storagePath,
-           register_type: "family_survey",
-           asha_id: user.uid
-         })
-       });
-       
-       if (!response.ok) throw new Error("Vision API failed");
-       
-       const data = await response.json();
-       
-       setResult({
-          status: 'review',
-          data: (data.rows || [])
-       });
+      // Step 1: Compress
+      const compressed = await compressImage(file);
+      
+      // Step 2: Upload to Cloud Storage
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not logged in');
+      path = `registers/${user.uid}/${Date.now()}.jpg`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, compressed);
+      setStoragePath(path);
+      console.log('[RegisterScan] Upload complete, path:', path);
     } catch (err) {
-       console.error(err);
-       setResult({ status: 'error', message: err.message });
-    } finally {
-       setIsLoading(false);
+      console.error('[RegisterScan] Upload failed:', err);
+      setError(`Upload failed: ${err.message}`);
+      setStep('upload');
+      return;
     }
-  };
 
-  const handleConfirmAll = async () => {
-    setIsLoading(true);
+    setStep('processing');
+    console.log('[RegisterScan] Step: processing — calling extract API');
+
     try {
-      // Typically we'd batch write them.
-      for (let rec of result.data) {
-        await addDoc(collection(db, 'scanned_records'), {
-           ...(rec.fields || {}),
-           source: "ocr_import",
-           originalOcrRaw: rec,
-           ashaId: user.uid,
-           scannedAt: serverTimestamp()
-        });
+      const user = auth.currentUser;
+      const token = await user.getIdToken();
+      
+      // Add 90-second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/register/extract`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storage_path: path, register_type: registerType }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
+      console.log('[RegisterScan] Extract API response status:', res.status);
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Extraction failed (${res.status}): ${errText}`);
       }
-      setResult({ status: 'success', data: result.data });
+      
+      const data = await res.json();
+      console.log('[RegisterScan] Extracted rows:', data.rows?.length);
+      setRows(data.rows || []);
+      setTotalFound(data.total_rows_found || data.rows?.length || 0);
+      setStep('review');
     } catch (err) {
-      console.error(err);
-      alert('Failed to save records: ' + err.message);
-    } finally {
-      setIsLoading(false);
+      if (err.name === 'AbortError') {
+        setError('Request timed out after 90 seconds. The image may be too large or the server is busy.');
+      } else {
+        console.error('[RegisterScan] Extract API failed:', err);
+        setError(`AI extraction failed: ${err.message}`);
+      }
+      setStep('error');
     }
   };
 
-  return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#D3D1C7] space-y-6">
-        <h2 className="text-xl font-bold text-[#1A1A18]">Register Scanner (OCR)</h2>
-        <p className="text-sm text-[#5F5E5A]">Take a photo of your handwritten register to automatically import patient data.</p>
+  const updateRowField = (rowIdx, field, value) => {
+    setRows(prev => prev.map((r, i) => i === rowIdx ? { ...r, fields: { ...r.fields, [field]: value }, needs_review: false } : r));
+  };
+
+  const saveAll = async () => {
+    setStep('saving');
+    try {
+      const ashaId = getAshaId();
+      let saved = 0;
+      
+      for (const row of rows) {
+        const payload = {
+          ...row.fields,
+          ashaId,
+          source: 'ocr_import',
+          storagePath,
+          createdAt: serverTimestamp()
+        };
         
-        {result?.status === 'success' ? (
-            <div className="space-y-4">
-                <div className="bg-[#EAF3DE] p-4 rounded-xl border border-[#1D9E75]">
-                    <h3 className="font-semibold text-[#085041] mb-2">Import Successful</h3>
-                    <p className="text-sm text-[#085041]">Found and saved {result.data.length} records to the database.</p>
-                </div>
-                <button onClick={clearPhoto} className="w-full py-3 bg-[#1D9E75] text-white rounded-xl font-medium shadow-md">Scan Another Page</button>
-            </div>
-        ) : result?.status === 'review' ? (
-            <div className="space-y-4">
-                <div className="bg-[#FFF8E1] p-4 rounded-xl border border-[#FFCA28]">
-                    <h3 className="font-semibold text-[#1A1A18] mb-2">Review Extracted Data</h3>
-                    <p className="text-sm text-[#5F5E5A]">Found {result.data.length} rows. Please review any low confidence (amber) cells before confirming.</p>
-                </div>
-                
-                <div className="overflow-x-auto border border-[#D3D1C7] rounded-xl shadow-sm">
-                   <table className="w-full text-sm text-left text-gray-700">
-                     <thead className="bg-gray-50 text-xs uppercase text-gray-500 border-b">
-                       <tr>
-                         {(result.data.length > 0 ? Object.keys(result.data[0].fields || {}) : []).map(h => 
-                           <th key={h} className="px-4 py-2 whitespace-nowrap">{h.replace(/_/g, ' ')}</th>
-                         )}
-                       </tr>
-                     </thead>
-                     <tbody className="divide-y divide-gray-100">
-                       {result.data.map((r, i) => {
-                         const needsReview = r.needs_review;
-                         const headers = Object.keys(r.fields || {});
-                         return (
-                           <tr key={i} className={needsReview ? 'bg-amber-50/50' : 'bg-white'}>
-                             {headers.map(h => {
-                               const conf = (r.confidence && r.confidence[h]) ? r.confidence[h] : 1.0;
-                               const isLowConf = conf < 0.8;
-                               const isUnreadable = r.unreadable_fields && r.unreadable_fields.includes(h);
-                               const cellClass = "px-4 py-3";
-                               
-                               const valClass = isUnreadable 
-                                    ? 'text-red-500 font-bold border border-red-500 px-1 inline-block' 
-                                    : isLowConf 
-                                        ? 'text-amber-800 bg-amber-100 border border-amber-400 font-medium px-1 rounded inline-block' 
-                                        : '';
+        if (registerType === 'family_survey') {
+          await addDoc(collection(db, 'household_members'), payload);
+        } else if (registerType === 'village_survey') {
+          await addDoc(collection(db, 'village_surveys'), payload);
+        } else if (registerType === 'vaccination') {
+          await addDoc(collection(db, 'vaccinations'), payload);
+        }
+        saved++;
+      }
+      
+      setStep('done');
+    } catch (err) {
+      setError(err.message);
+      setStep('review');
+    }
+  };
 
-                               return (
-                                 <td key={h} className={cellClass}>
-                                   <span className={valClass}>{isUnreadable ? '?' : (r.fields[h] || '-')}</span>
-                                 </td>
-                               );
-                             })}
-                           </tr>
-                         );
-                       })}
-                     </tbody>
-                   </table>
-                </div>
+  const needsReviewCount = rows.filter(r => r.needs_review).length;
 
-                <div className="flex gap-4">
-                  <button onClick={clearPhoto} className="flex-1 py-3 bg-gray-100 text-gray-800 rounded-xl font-medium shadow-sm border hover:bg-gray-200">Discard</button>
-                  <button onClick={handleConfirmAll} disabled={isLoading} className="flex-1 py-3 bg-[#1D9E75] text-white rounded-xl font-medium shadow-md hover:bg-[#16815e]">✓ Confirm All</button>
-                </div>
-            </div>
-        ) : (
-            <div className="space-y-4">
-                {result?.status === 'error' && (
-                   <div className="bg-[#FCEBEB] p-3 rounded-xl border border-[#E24B4A] text-sm text-[#791F1F]">
-                      Error Processing Image: {result.message}
-                   </div>
-                )}
-                
-                {preview ? (
-                   <div className="relative">
-                      <img src={preview} alt="Document preview" className="w-full h-64 object-cover rounded-xl border" />
-                      <button onClick={clearPhoto} className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md text-red-500 hover:bg-gray-100">
-                         <span className="material-symbols-outlined">close</span>
-                      </button>
-                   </div>
-                ) : (
-                   <div 
-                       onClick={() => fileInputRef.current.click()}
-                       className="border-2 border-dashed border-[#1D9E75] rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-[#EAF3DE] transition-colors"
-                   >
-                       <span className="material-symbols-outlined text-4xl text-[#1D9E75] mb-2">add_a_photo</span>
-                       <p className="text-sm font-medium text-[#1D9E75]">Tap to take photo</p>
-                   </div>
-                )}
-                
-                <input 
-                   type="file" 
-                   accept="image/*" 
-                   capture="environment" 
-                   ref={fileInputRef} 
-                   onChange={handleCapture} 
-                   className="hidden" 
-                />
-
-                <button 
-                   onClick={handleUpload} 
-                   disabled={!photo || isLoading}
-                   className="w-full py-3 bg-[#1D9E75] text-white rounded-xl font-medium disabled:opacity-50 flex items-center justify-center shadow-md active:scale-[0.98] hover:bg-[#16815e]"
-                >
-                   {isLoading ? <span className="material-symbols-outlined animate-spin text-xl py-1">refresh</span> : 'Process With Vision AI'}
-                </button>
-            </div>
-        )}
+  // ── RENDER ──────────────────────────────────────────────────────────────
+  if (step === 'upload') return (
+    <div style={{padding:'20px'}}>
+      <h2 style={{fontSize:'18px',fontWeight:'600',marginBottom:'8px'}}>📷 Import from Register</h2>
+      <p style={{color:'#666',fontSize:'13px',marginBottom:'16px'}}>Photograph your paper ASHA register to import data automatically.</p>
+      
+      <select value={registerType} onChange={e => setRegisterType(e.target.value)} style={{width:'100%',padding:'10px',borderRadius:'8px',border:'1px solid #ddd',marginBottom:'16px',fontSize:'14px'}}>
+        <option value="family_survey">Family Survey Register (कुटुंब पाहणी)</option>
+        <option value="village_survey">Village Health Survey (ग्राम आरोग्य)</option>
+        <option value="vaccination">Vaccination Register (लसीकरण)</option>
+      </select>
+      
+      <div onClick={() => fileInputRef.current?.click()} style={{border:'2px dashed #1D9E75',borderRadius:'12px',padding:'40px 20px',textAlign:'center',cursor:'pointer',background:'#EAF3DE'}}>
+        <div style={{fontSize:'48px'}}>📷</div>
+        <p style={{fontWeight:'600',color:'#1D9E75',marginTop:'8px'}}>Tap to photograph register</p>
+        <p style={{color:'#666',fontSize:'12px',marginTop:'4px'}}>Photograph one page at a time for best accuracy</p>
+      </div>
+      
+      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={e => handleFileSelect(e.target.files[0])} />
+      
+      <button onClick={() => { fileInputRef.current.removeAttribute('capture'); fileInputRef.current?.click(); }} style={{width:'100%',padding:'12px',marginTop:'12px',border:'1px solid #ddd',borderRadius:'8px',background:'white',color:'#666',cursor:'pointer'}}>
+        🖼️ Choose from Gallery
+      </button>
+      
+      {error && <p style={{color:'#E24B4A',marginTop:'12px',fontSize:'13px'}}>❌ {error}</p>}
     </div>
   );
-}
+
+  if (step === 'uploading') return (
+    <div style={{padding:'40px',textAlign:'center'}}>
+      <div style={{fontSize:'32px'}}>⬆️</div>
+      <p style={{marginTop:'12px',color:'#666',fontWeight:'600'}}>Uploading photo to storage...</p>
+      <p style={{color:'#999',fontSize:'12px',marginTop:'4px'}}>Please wait</p>
+    </div>
+  );
+  
+  if (step === 'processing') return (
+    <div style={{padding:'40px',textAlign:'center'}}>
+      <div style={{fontSize:'32px',display:'inline-block',animation:'spin 2s linear infinite'}}>🤖</div>
+      <p style={{fontWeight:'600',marginTop:'12px'}}>AI is reading your register...</p>
+      <p style={{color:'#666',fontSize:'13px',marginTop:'4px'}}>Extracting all rows and fields</p>
+      <p style={{color:'#999',fontSize:'11px',marginTop:'8px'}}>This may take up to 60 seconds</p>
+    </div>
+  );
+
+  if (step === 'error') return (
+    <div style={{padding:'24px'}}>
+      <div style={{background:'#FCEBEB',border:'1px solid #E24B4A',borderRadius:'12px',padding:'20px',textAlign:'center'}}>
+        <div style={{fontSize:'32px'}}>❌</div>
+        <p style={{fontWeight:'600',color:'#791F1F',marginTop:'8px'}}>Extraction Failed</p>
+        <p style={{color:'#E24B4A',fontSize:'13px',marginTop:'8px'}}>{error}</p>
+        <button onClick={() => { setError(''); setStep('upload'); }} style={{marginTop:'16px',padding:'10px 20px',background:'#1D9E75',color:'white',border:'none',borderRadius:'8px',cursor:'pointer',fontWeight:'600'}}>
+          Try Again
+        </button>
+      </div>
+    </div>
+  );
+
+  if (step === 'review') return (
+    <div style={{padding:'16px'}}>
+      <div style={{background:'#EAF3DE',borderRadius:'8px',padding:'12px',marginBottom:'8px'}}>
+        <p style={{fontWeight:'600',color:'#27500A'}}>✓ {totalFound} records found</p>
+      </div>
+      {needsReviewCount > 0 && (
+        <div style={{background:'#FAEEDA',borderRadius:'8px',padding:'12px',marginBottom:'12px'}}>
+          <p style={{color:'#633806',fontSize:'13px'}}>⚠️ {needsReviewCount} rows need your review (shown in amber)</p>
+        </div>
+      )}
+      
+      {/* Table view */}
+      <div style={{overflowX:'auto',marginBottom:'16px'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:'12px'}}>
+          <thead>
+            <tr style={{background:'#f5f5f5'}}>
+              <th style={{padding:'8px',textAlign:'left',borderBottom:'1px solid #ddd'}}>#</th>
+              <th style={{padding:'8px',textAlign:'left',borderBottom:'1px solid #ddd'}}>Name</th>
+              <th style={{padding:'8px',textAlign:'left',borderBottom:'1px solid #ddd'}}>Gender</th>
+              <th style={{padding:'8px',textAlign:'left',borderBottom:'1px solid #ddd'}}>DOB</th>
+              <th style={{padding:'8px',textAlign:'left',borderBottom:'1px solid #ddd'}}>Mobile</th>
+              <th style={{padding:'8px',borderBottom:'1px solid #ddd'}}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i} style={{background: row.needs_review ? '#FAEEDA' : 'white'}} onClick={() => setEditingRow(editingRow === i ? null : i)}>
+                <td style={{padding:'8px',borderBottom:'1px solid #f0f0f0'}}>{row.row_number || i+1}</td>
+                <td style={{padding:'8px',borderBottom:'1px solid #f0f0f0',fontWeight:'500'}}>{row.fields.member_name || <span style={{color:'#ccc'}}>?</span>}</td>
+                <td style={{padding:'8px',borderBottom:'1px solid #f0f0f0'}}>{row.fields.gender || '?'}</td>
+                <td style={{padding:'8px',borderBottom:'1px solid #f0f0f0'}}>{row.fields.date_of_birth || '?'}</td>
+                <td style={{padding:'8px',borderBottom:'1px solid #f0f0f0'}}>{row.fields.mobile_number || '-'}</td>
+                <td style={{padding:'8px',borderBottom:'1px solid #f0f0f0',textAlign:'center'}}>
+                  {row.needs_review ? <span style={{color:'#BA7517'}}>⚠️</span> : <span style={{color:'#1D9E75'}}>✓</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Inline edit for selected row */}
+      {editingRow !== null && (
+        <div style={{background:'white',border:'1px solid #1D9E75',borderRadius:'8px',padding:'16px',marginBottom:'16px'}}>
+          <p style={{fontWeight:'600',marginBottom:'12px',fontSize:'14px'}}>Edit Row {editingRow + 1}</p>
+          {Object.entries(rows[editingRow].fields).map(([field, val]) => (
+            <div key={field} style={{marginBottom:'8px'}}>
+              <label style={{fontSize:'11px',color:'#888',display:'block',marginBottom:'2px'}}>{field.replace(/_/g,' ').toUpperCase()}</label>
+              <input value={val || ''} onChange={e => updateRowField(editingRow, field, e.target.value)} style={{width:'100%',padding:'8px',border:'1px solid #ddd',borderRadius:'6px',fontSize:'13px'}} />
+            </div>
+          ))}
+          <button onClick={() => setEditingRow(null)} style={{padding:'8px 16px',background:'#1D9E75',color:'white',border:'none',borderRadius:'6px',cursor:'pointer',fontSize:'13px'}}>Save Row ✓</button>
+        </div>
+      )}
+
+      <button onClick={saveAll} style={{width:'100%',padding:'14px',background:'#1D9E75',color:'white',border:'none',borderRadius:'10px',fontSize:'15px',fontWeight:'600',cursor:'pointer'}}>
+        ✓ Import All {rows.length} Records
+      </button>
+      <button onClick={() => setStep('upload')} style={{width:'100%',padding:'12px',marginTop:'8px',background:'white',color:'#666',border:'1px solid #ddd',borderRadius:'10px',cursor:'pointer'}}>
+        ← Retake Photo
+      </button>
+    </div>
+  );
+
+  if (step === 'saving') return <div style={{padding:'40px',textAlign:'center'}}><p>💾 Saving {rows.length} records...</p></div>;
+  
+  if (step === 'done') return (
+    <div style={{padding:'40px',textAlign:'center'}}>
+      <div style={{fontSize:'48px'}}>✅</div>
+      <p style={{fontWeight:'600',fontSize:'18px',marginTop:'12px',color:'#27500A'}}>{rows.length} records imported!</p>
+      <button onClick={() => setStep('upload')} style={{marginTop:'20px',padding:'12px 24px',background:'#1D9E75',color:'white',border:'none',borderRadius:'8px',cursor:'pointer'}}>Import Another Page</button>
+    </div>
+  );
+};
+export default RegisterScan;

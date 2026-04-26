@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, Body
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import csv
 import io
+import json
 from fastapi.responses import StreamingResponse
 from google.cloud import firestore
 import firebase_admin
@@ -12,6 +13,40 @@ import structlog
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+# ============================================================================
+# TRANSLATION ENDPOINT
+# ============================================================================
+
+@router.post("/translate")
+async def translate_text(
+    payload: dict = Body(...),
+    user=Depends(verify_firebase_token)
+):
+    """Translate English survey label to Marathi and Hindi using Gemini."""
+    text = payload.get("text", "").strip()
+    if not text:
+        raise HTTPException(400, "text is required")
+    try:
+        from vertexai.generative_models import GenerativeModel, GenerationConfig
+        model = GenerativeModel("gemini-2.0-flash-001")
+        prompt = (
+            f'Translate the following English health survey label to Marathi and Hindi. '
+            f'Return ONLY valid JSON: {{"mr": "marathi translation", "hi": "hindi translation"}}. '
+            f'Label: "{text}"'
+        )
+        response = model.generate_content(
+            prompt,
+            generation_config=GenerationConfig(response_mime_type="application/json")
+        )
+        result = json.loads(response.text)
+        return {"mr": result.get("mr", ""), "hi": result.get("hi", "")}
+    except Exception as e:
+        logger.error("translate_error", error=str(e))
+        raise HTTPException(500, f"Translation failed: {str(e)}")
+
+
 
 
 # ============================================================================
@@ -26,7 +61,7 @@ async def get_workers(head_id: str, user=Depends(verify_firebase_token)):
         
         # Get head document
         head_doc = db.collection("asha_heads").document(head_id).get()
-        if not head_doc.exists():
+        if not head_doc.exists:
             # Fallback: get all ASHA workers in same district
             workers = db.collection("ashas")\
                 .where("district", "==", user.get("district", "Beed"))\
@@ -80,46 +115,71 @@ async def get_workers(head_id: str, user=Depends(verify_firebase_token)):
 
 @router.post("/supervisor/workers/add")
 async def add_worker(
-    name: str = Query(...),
-    phone: str = Query(...),
-    village: str = Query(...),
-    district: str = Query(...),
-    user=Depends(require_role("asha_head"))
+    payload: dict = Body(...),
+    user=Depends(verify_firebase_token)
 ):
-    """Add a new ASHA worker under current supervisor."""
+    import re
+    import firebase_admin.auth as fb_auth
+    db_client = firestore.Client()
+
+    name = payload.get('name', '').strip()
+    phone = re.sub(r'\D', '', payload.get('phone', ''))
+    village = payload.get('village', '').strip()
+    district = payload.get('district', 'Beed').strip()
+
+    if not name or not phone:
+        raise HTTPException(400, "Name and phone are required")
+
+    # Normalize phone
+    if len(phone) == 10:
+        phone = f"+91{phone}"
+    elif not phone.startswith('+'):
+        phone = f"+{phone}"
+
+    # Resolve head's actual Firestore doc ID by email
+    email = user.get('email', '')
+    head_id = user.get('uid')
+    if email:
+        head_docs = list(db_client.collection("asha_heads").where("email", "==", email).stream())
+        if head_docs:
+            head_id = head_docs[0].id
+
     try:
         # Create Firebase Auth user
-        firebase_user = auth.create_user(phone_number=f"+91{phone}")
-        
-        # Set custom claims
-        auth.set_custom_user_claims(firebase_user.uid, {
+        new_user = fb_auth.create_user(phone_number=phone, display_name=name)
+        fb_auth.set_custom_user_claims(new_user.uid, {
             "role": "asha_worker",
             "district": district,
-            "asha_head_id": user["uid"]
+            "asha_head_id": head_id
         })
-        
+
         # Create Firestore document
-        db = firestore.Client()
-        db.collection("ashas").document(firebase_user.uid).set({
+        db_client.collection("ashas").document(new_user.uid).set({
             "name": name,
             "phone": phone,
             "village": village,
             "district": district,
-            "supervisorId": user["uid"],
+            "supervisorId": head_id,
             "isActive": True,
+            "totalFamilies": 0,
+            "coveragePercent": 0,
             "createdAt": firestore.SERVER_TIMESTAMP
         })
-        
-        # Add to head's ashaIds list
-        db.collection("asha_heads").document(user["uid"]).update({
-            "ashaIds": firestore.ArrayUnion([firebase_user.uid])
+
+        # Add to head's ashaIds array
+        db_client.collection("asha_heads").document(head_id).update({
+            "ashaIds": firestore.ArrayUnion([new_user.uid])
         })
-        
-        logger.info("worker_created", worker_id=firebase_user.uid)
-        return {"success": True, "worker_id": firebase_user.uid}
+
+        logger.info("worker_added", worker_id=new_user.uid, name=name, head_id=head_id)
+        return {"success": True, "worker_id": new_user.uid, "name": name}
+
+    except fb_auth.PhoneNumberAlreadyExistsError:
+        raise HTTPException(400, f"Phone {phone} is already registered")
     except Exception as e:
         logger.error("add_worker_error", error=str(e))
-        raise HTTPException(status_code=500, detail="Error adding worker")
+        raise HTTPException(500, f"Failed to create worker: {str(e)}")
+
 
 
 # ============================================================================
@@ -277,21 +337,35 @@ async def publish_survey(
 # ============================================================================
 
 @router.get("/dashboard-stats")
-async def get_dashboard_stats():
-    """Returns live dashboard statistics. In production: real Firestore aggregations."""
+async def dashboard_stats(head_id: str, user=Depends(verify_firebase_token)):
+    db = firestore.Client()
+    head_doc = db.collection("asha_heads").document(head_id).get()
+    asha_ids = head_doc.to_dict().get("ashaIds", []) if head_doc.exists else []
+    
+    total_families = 0
+    critical_cases = 0
+    pending_syncs = 0
+    active_today = 0
+    
+    from datetime import datetime, timedelta
+    today_start = datetime.now().replace(hour=0,minute=0,second=0,microsecond=0)
+    
+    for aid in asha_ids:
+        fams = list(db.collection("households").where("ashaId","==",aid).stream())
+        total_families += len(fams)
+        
+        crits = list(db.collection("children").where("ashaId","==",aid).where("riskLevel","==","CRITICAL").stream())
+        critical_cases += len(crits)
+        
+        recent = list(db.collection("module_submissions").where("ashaId","==",aid).where("submittedAt",">=",today_start).limit(1).stream())
+        if recent: active_today += 1
+    
     return {
-        "active_workers": 8,
-        "total_workers": 12,
-        "total_families": 2400,
-        "coverage_percent": 67,
-        "critical_cases": 7,
-        "pending_review": 15,
-        "pending_sync": 234,
-        "total_children": 450,
-        "total_pregnancies": 78,
-        "sam_cases": 5,
-        "mam_cases": 12,
-        "high_risk_pregnancies": 8,
+        "worker_count": len(asha_ids),
+        "active_today": active_today,
+        "total_families": total_families,
+        "critical_cases": critical_cases,
+        "pending_reviews": len(list(db.collection("pending_reviews").where("reviewStatus","==","pending").stream()))
     }
 
 

@@ -48,3 +48,5 @@ setup-gcs-lifecycle.sh
 API_KEYS_NEEDED.md
 FEATURE_CHECKLIST.md
 seed_data.py
+import_dummy_data.py
+patch_head_email.js

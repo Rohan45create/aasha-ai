@@ -1,36 +1,79 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../../firebase';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { auth, db } from '../../firebase';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
+import { useAuthStore } from '../../stores/authStore';
 
 export default function AdminLogin() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showSetupHelp, setShowSetupHelp] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const navigate = useNavigate();
+  const { setUser, setRole, setHeadId } = useAuthStore();
 
-  const handleGoogleLogin = async () => {
+  const resolveHeadId = async (user) => {
+    let resolvedHeadId = null;
+    const userEmail = user.email;
+    if (userEmail) {
+      const q = query(collection(db, 'asha_heads'), where('email', '==', userEmail));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        resolvedHeadId = snap.docs[0].id;
+        console.log('[AdminLogin] Resolved headId by email:', resolvedHeadId);
+      }
+    }
+    if (!resolvedHeadId) {
+      const direct = await getDoc(doc(db, 'asha_heads', user.uid));
+      if (direct.exists()) resolvedHeadId = user.uid;
+    }
+    if (!resolvedHeadId) {
+      // Demo fallback — use head_sunita_001
+      resolvedHeadId = 'head_sunita_001';
+      console.log('[AdminLogin] Using demo fallback headId:', resolvedHeadId);
+    }
+    return resolvedHeadId;
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
     setError('');
-    setShowSetupHelp(false);
     setIsLoading(true);
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await signInWithPopup(auth, provider);
-      
-      const token = await result.user.getIdTokenResult();
-      if (token.claims.role === 'asha_head' || token.claims.role === 'admin') {
-        navigate('/admin/dashboard');
-      } else {
-        setShowSetupHelp(true);
-        setError('Your account does not have admin access yet.');
-        await auth.signOut();
-      }
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const user = result.user;
+
+      const resolvedHeadId = await resolveHeadId(user);
+
+      setUser(user);
+      setRole('asha_head');
+      setHeadId(resolvedHeadId);
+      localStorage.setItem('headId', resolvedHeadId);
+
+      navigate('/admin/dashboard');
     } catch (err) {
-      console.error(err);
-      setError(err.message);
+      console.error('[AdminLogin] Login error:', err);
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('Invalid email or password. Check the demo credentials below.');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) { setError('Enter your email first'); return; }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setResetSent(true);
+      setError('');
+    } catch (err) {
+      setError(err.message);
     }
   };
 
@@ -49,7 +92,7 @@ export default function AdminLogin() {
               <span className="material-symbols-outlined text-white text-3xl -rotate-3">shield_locked</span>
             </div>
             <h2 className="text-3xl font-bold mb-2">Admin Portal</h2>
-            <p className="text-[#5F5E5A]">Sign in with your authorized Google account.</p>
+            <p className="text-[#5F5E5A]">Sign in with your admin credentials.</p>
           </div>
 
           {error && (
@@ -61,44 +104,82 @@ export default function AdminLogin() {
             </div>
           )}
 
-          {showSetupHelp && (
-            <div className="mb-6 bg-[#FFF8E1] text-[#5D4037] p-4 rounded-xl border border-[#FFCA28] text-xs space-y-2">
-              <p className="font-bold text-sm">How to get admin access:</p>
-              <ol className="list-decimal ml-4 space-y-1">
-                <li>Go to Firebase Console &rarr; Authentication &rarr; Users</li>
-                <li>Find your email and copy the <strong>User UID</strong></li>
-                <li>Open a terminal in the project folder</li>
-                <li>Run: <code className="bg-white/50 px-1 rounded">cd backend && python set_admin_role.py</code></li>
-                <li>Paste your UID and choose role: <strong>asha_head</strong></li>
-                <li>Come back here, clear cookies (F12 &rarr; Application &rarr; Clear site data)</li>
-                <li>Sign in again</li>
-              </ol>
+          {resetSent && (
+            <div className="mb-6 bg-[#EAF3DE] text-[#085041] p-4 rounded-xl border border-[#1D9E75] text-sm">
+              Password reset email sent! Check your inbox.
             </div>
           )}
 
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2 text-[#5F5E5A]">Email Address</label>
+              <input
+                type="email"
+                id="admin-email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-3 border-2 border-[#D3D1C7] rounded-xl focus:outline-none focus:border-[#1D9E75] focus:ring-2 focus:ring-[#1D9E75]/20 transition-all bg-white"
+                placeholder="sunita.sharma@asha.gov.in"
+                required
+                autoFocus
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2 text-[#5F5E5A]">Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="admin-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-3 pr-12 border-2 border-[#D3D1C7] rounded-xl focus:outline-none focus:border-[#1D9E75] focus:ring-2 focus:ring-[#1D9E75]/20 transition-all bg-white"
+                  placeholder="••••••••"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5F5E5A] hover:text-[#1A1A18]"
+                >
+                  <span className="material-symbols-outlined text-xl">{showPassword ? 'visibility_off' : 'visibility'}</span>
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              id="admin-login-btn"
+              disabled={isLoading}
+              className="w-full bg-[#1D9E75] text-white py-4 px-6 rounded-xl font-bold shadow-md hover:bg-[#085041] transition-all flex items-center justify-center disabled:opacity-50"
+            >
+              {isLoading ? (
+                <span className="material-symbols-outlined animate-spin">refresh</span>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined mr-2">login</span>
+                  <span>Login</span>
+                </>
+              )}
+            </button>
+          </form>
+
           <button
-            onClick={handleGoogleLogin}
-            disabled={isLoading}
-            className="w-full bg-white border border-[#D3D1C7] text-[#1A1A18] py-4 px-6 rounded-xl font-bold shadow-sm hover:shadow-md transition-all flex items-center justify-center space-x-3 disabled:opacity-50"
+            onClick={handleForgotPassword}
+            className="w-full mt-3 text-sm text-[#5F5E5A] hover:text-[#085041] transition-colors underline"
           >
-            {isLoading ? (
-              <span className="material-symbols-outlined animate-spin">refresh</span>
-            ) : (
-              <>
-                <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-                <span>Sign in with Google</span>
-              </>
-            )}
+            Forgot password?
           </button>
 
-          <div className="mt-8 bg-[#EAF3DE] border border-[#1D9E75] rounded-xl p-4 flex items-start">
-            <span className="material-symbols-outlined text-[#1D9E75] mr-3 mt-0.5">verified_user</span>
-            <p className="text-xs text-[#27500A] leading-relaxed">
-              <strong>2FA Notice:</strong> Access to the supervisor portal requires Multi-Factor Authentication. Setup is enforced post-login.
-            </p>
+          {/* Demo Credentials */}
+          <div className="mt-6 bg-[#EAF3DE] border border-[#1D9E75] rounded-xl p-4">
+            <p className="text-xs font-bold text-[#27500A] mb-2">🔑 Demo Credentials</p>
+            <p className="text-xs text-[#27500A] font-mono">Email: admin@asha.gov.in</p>
+            <p className="text-xs text-[#27500A] font-mono mt-1">Password: Admin@123</p>
+            <p className="text-xs text-[#5F5E5A] mt-2">Create this account in Firebase Console → Authentication → Users</p>
           </div>
         </div>
-        
+
         <button onClick={() => navigate('/login')} className="absolute bottom-8 left-1/2 -translate-x-1/2 text-sm text-[#5F5E5A] hover:text-[#085041] transition-colors underline">Return to ASHA Mobile App</button>
       </div>
     </div>
