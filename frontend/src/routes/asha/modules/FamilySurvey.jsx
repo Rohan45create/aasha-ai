@@ -202,6 +202,7 @@ export default React.memo(function FamilySurvey() {
   };
 
   const getVoiceTag = (memberId, field) => {
+    if (voiceFilledFields[memberId]?.includes(field)) {
       return <span className="text-xs text-[#1D9E75] font-bold px-2 py-0.5 bg-[#EAF3DE] rounded border border-[#1D9E75] mt-1 inline-flex items-center"><span className="material-symbols-outlined text-[14px] mr-1">mic</span> Voice filled</span>;
     }
     return null;
