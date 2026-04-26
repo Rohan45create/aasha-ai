@@ -5,8 +5,9 @@ import { useAuthStore } from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
 import VoiceOverlay from './VoiceOverlay';
 import AmbientToggle from './AmbientToggle';
+import AadhaarAutofill from './AadhaarAutofill';
 
-export default function BaseModuleForm({ title, moduleIcon, collectionName, fields, moduleName, onSubmit, onFormChange }) {
+export default function BaseModuleForm({ title, moduleIcon, collectionName, fields, moduleName, onSubmit, onFormChange, showAadhaar = true, aadhaarPersonLabel = '' }) {
   const { user, ashaId: storeAshaId } = useAuthStore();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({});
@@ -18,6 +19,7 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
   const voiceModule = moduleName || collectionName || 'family_survey';
   const [showVoice, setShowVoice] = useState(false);
   const [voiceFilledFields, setVoiceFilledFields] = useState([]);
+  const [aadhaarFilledFields, setAadhaarFilledFields] = useState([]);
 
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
@@ -40,6 +42,26 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
       setVoiceFilledFields(prev => [...new Set([...prev, ...newFilledFields])]);
       showToast('Voice data applied to form', 'success');
     }
+  };
+
+  // Aadhaar autofill handler
+  const handleAadhaarAutofill = (payload) => {
+    if (!payload || typeof payload !== 'object') return;
+    const filledKeys = [];
+    setFormData(prev => {
+      const merged = { ...prev };
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== '') {
+          merged[key] = String(value);
+          filledKeys.push(key);
+        }
+      });
+      if (onFormChange) onFormChange(merged);
+      return merged;
+    });
+    setAadhaarFilledFields(prev => [...new Set([...prev, ...filledKeys])]);
+    const count = Object.keys(payload).length;
+    showToast(`Aadhaar scanned — ${count} field${count !== 1 ? 's' : ''} autofilled`, 'success');
   };
 
   const validate = () => {
@@ -118,12 +140,15 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#D3D1C7] relative">
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl shadow-lg text-sm font-medium animate-slide-down ${
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl shadow-lg text-sm font-medium flex items-center space-x-2 animate-slide-down ${
           toast.type === 'success' ? 'bg-[#EAF3DE] text-[#085041] border border-[#1D9E75]' :
           toast.type === 'error' ? 'bg-[#FCEBEB] text-[#791F1F] border border-[#E24B4A]' :
           'bg-white text-[#1A1A18] border border-[#D3D1C7]'
         }`}>
-          {toast.message}
+          <span className="material-symbols-outlined text-[18px]">
+            {toast.type === 'success' ? 'check_circle' : toast.type === 'error' ? 'error' : 'info'}
+          </span>
+          <span>{toast.message}</span>
         </div>
       )}
 
@@ -140,12 +165,22 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Aadhaar Autofill — shown at top of every form */}
+        {showAadhaar && (
+          <AadhaarAutofill
+            moduleName={moduleName || 'default'}
+            personLabel={aadhaarPersonLabel}
+            onAutofill={handleAadhaarAutofill}
+          />
+        )}
+
         {fields.map(field => (
           <div key={field.id}>
             <label className="block text-sm font-medium mb-1 text-[#5F5E5A]">
               {field.label}
               {field.required && <span className="text-[#E24B4A] ml-1">*</span>}
-              {voiceFilledFields.includes(field.id) && <span className="ml-2 text-xs text-[#1D9E75] font-bold px-2 py-0.5 bg-[#EAF3DE] rounded border border-[#1D9E75]">🎤 Voice filled</span>}
+              {voiceFilledFields.includes(field.id) && <span className="ml-2 text-xs text-[#1D9E75] font-bold px-2 py-0.5 bg-[#EAF3DE] rounded border border-[#1D9E75] inline-flex items-center"><span className="material-symbols-outlined text-[14px] mr-1">mic</span> Voice filled</span>}
+              {aadhaarFilledFields.includes(field.id) && !voiceFilledFields.includes(field.id) && <span className="ml-2 text-xs text-blue-600 font-bold px-2 py-0.5 bg-blue-50 rounded border border-blue-300 inline-flex items-center"><span className="material-symbols-outlined text-[14px] mr-1">badge</span> Aadhaar filled</span>}
             </label>
             {field.type === 'select' ? (
               <select

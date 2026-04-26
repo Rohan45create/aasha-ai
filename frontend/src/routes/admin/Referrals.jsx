@@ -8,11 +8,11 @@ import { db } from '../../firebase';
 
 // ─── Status config (matching existing "Pending","Admitted","Discharged","Follow-up Due") ──
 const STATUS_CONFIG = {
-  'Pending':        { label: 'Pending Review', color: '#BA7517', bg: '#FAEEDA', icon: '⏳' },
-  'Admitted':       { label: 'Admitted',        color: '#185FA5', bg: '#E6F1FB', icon: '🏥' },
-  'Discharged':     { label: 'Discharged',      color: '#27500A', bg: '#EAF3DE', icon: '🏠' },
-  'Follow-up Due':  { label: 'Follow-up Due',   color: '#E24B4A', bg: '#FCEBEB', icon: '📅' },
-  'Rejected':       { label: 'Rejected',         color: '#E24B4A', bg: '#FCEBEB', icon: '❌' },
+  'Pending':        { label: 'Pending Review', color: '#BA7517', bg: '#FAEEDA', icon: 'pending_actions' },
+  'Admitted':       { label: 'Admitted',        color: '#185FA5', bg: '#E6F1FB', icon: 'local_hospital' },
+  'Discharged':     { label: 'Discharged',      color: '#27500A', bg: '#EAF3DE', icon: 'home' },
+  'Follow-up Due':  { label: 'Follow-up Due',   color: '#E24B4A', bg: '#FCEBEB', icon: 'calendar_today' },
+  'Rejected':       { label: 'Rejected',         color: '#E24B4A', bg: '#FCEBEB', icon: 'cancel' },
 };
 
 const RISK_CONFIG = {
@@ -94,7 +94,7 @@ const ReviewModal = ({ referral, onClose }) => {
             <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1A1A18' }}>Review NRC Referral</h3>
             <p style={{ fontSize: '13px', color: '#777' }}>Submitted by ASHA: <strong>{referral.ashaId}</strong></p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#888' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#888' }}><span className="material-symbols-outlined">close</span></button>
         </div>
 
         {/* Child info card */}
@@ -103,7 +103,7 @@ const ReviewModal = ({ referral, onClose }) => {
             <div>
               <p style={{ fontWeight: '700', fontSize: '16px', color: '#1A1A18' }}>{referral.childName}</p>
               <p style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
-                {referral.village && `📍 ${referral.village} · `}Referred: {referral.referredDate || 'N/A'}
+                {referral.village && <><span className="material-symbols-outlined text-[14px] align-middle">location_on</span> {referral.village} &middot; </>}Referred: {referral.referredDate || 'N/A'}
               </p>
               <p style={{ fontSize: '13px', color: rCfg.color, fontWeight: '600', marginTop: '6px' }}>
                 {referral.reason}
@@ -128,7 +128,7 @@ const ReviewModal = ({ referral, onClose }) => {
 
         {/* NRC Name — admin fills this */}
         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#555', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          🏥 NRC / Facility Name <span style={{ color: '#E24B4A' }}>*</span>
+          <span className="material-symbols-outlined" style={{fontSize: '16px', verticalAlign: 'middle', marginRight: '4px'}}>local_hospital</span> NRC / Facility Name <span style={{ color: '#E24B4A' }}>*</span>
         </label>
         <input
           type="text"
@@ -166,7 +166,7 @@ const ReviewModal = ({ referral, onClose }) => {
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
               }}
             >
-              <span style={{ fontSize: '16px' }}>{cfg.icon}</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>{cfg.icon}</span>
               {cfg.label}
             </button>
           ))}
@@ -215,7 +215,7 @@ const ReviewModal = ({ referral, onClose }) => {
               opacity: saving ? 0.7 : 1,
             }}
           >
-            {saving ? 'Saving…' : `${sCfg.icon} Save — ${sCfg.label}`}
+            {saving ? 'Saving…' : <><span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle', marginRight: '4px'}}>{sCfg.icon}</span> Save — {sCfg.label}</>}
           </button>
         </div>
       </div>
@@ -303,7 +303,7 @@ export default function Referrals() {
                 transition: 'all 0.15s',
               }}
             >
-              {sCfg ? `${sCfg.icon} ${f}` : f} {count > 0 && `(${count})`}
+              {sCfg ? <><span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle', marginRight: '4px'}}>{sCfg.icon}</span> {f}</> : f} {count > 0 && `(${count})`}
             </button>
           );
         })}
@@ -326,7 +326,7 @@ export default function Referrals() {
           textAlign: 'center', padding: '60px 20px',
           background: '#F5F4EF', borderRadius: '16px',
         }}>
-          <p style={{ fontSize: '40px', marginBottom: '12px' }}>📋</p>
+          <span className="material-symbols-outlined" style={{ fontSize: '40px', marginBottom: '12px', color: '#888' }}>assignment</span>
           <p style={{ fontWeight: '600', color: '#1A1A18' }}>
             No referrals {filter !== 'All' ? `with status "${filter}"` : 'yet'}
           </p>
@@ -365,7 +365,7 @@ export default function Referrals() {
                       )}
                     </div>
                     {r.village && (
-                      <p style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>📍 {r.village}</p>
+                      <p style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}><span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle'}}>location_on</span> {r.village}</p>
                     )}
                     <p style={{ fontSize: '13px', color: rCfg.color || '#555', fontWeight: '600', marginBottom: '4px' }}>
                       {r.reason}
@@ -380,7 +380,7 @@ export default function Referrals() {
                       padding: '4px 10px', borderRadius: '20px',
                       display: 'block', marginBottom: '4px', whiteSpace: 'nowrap',
                     }}>
-                      {sCfg.icon} {r.status}
+                      <span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle', marginRight: '4px'}}>{sCfg.icon}</span> {r.status}
                     </span>
                     <p style={{ fontSize: '10px', color: '#aaa' }}>
                       {r.referredDate || (r.createdAt?.toDate?.()?.toLocaleDateString('en-IN', {day:'numeric',month:'short'}) || '')}
@@ -395,8 +395,8 @@ export default function Referrals() {
                   padding: '8px 12px', marginBottom: '12px',
                   fontSize: '12px', color: '#666',
                 }}>
-                  <span>👩‍⚕️ <strong>{r.ashaId}</strong></span>
-                  {r.nrcName && <span>· 🏥 <strong>{r.nrcName}</strong></span>}
+                  <span><span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle'}}>medical_services</span> <strong>{r.ashaId}</strong></span>
+                  {r.nrcName && <span>&middot; <span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle'}}>local_hospital</span> <strong>{r.nrcName}</strong></span>}
                   {r.riskScore && <span>· Score: <strong style={{ color: rCfg.color }}>{r.riskScore}/100</strong></span>}
                 </div>
 
@@ -407,7 +407,7 @@ export default function Referrals() {
                     padding: '8px 12px', marginBottom: '12px',
                     fontSize: '12px', color: '#666',
                   }}>
-                    📝 {r.notes}
+                    <span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle'}}>edit_note</span> {r.notes}
                   </div>
                 )}
 
@@ -424,7 +424,7 @@ export default function Referrals() {
                     transition: 'all 0.15s',
                   }}
                 >
-                  {r.status === 'Pending' ? '✍️ Review & Assign NRC' : '✏️ Update Status / NRC Name'}
+                  {r.status === 'Pending' ? <><span className="material-symbols-outlined" style={{fontSize: '16px', verticalAlign: 'middle', marginRight: '4px'}}>edit_document</span> Review & Assign NRC</> : <><span className="material-symbols-outlined" style={{fontSize: '16px', verticalAlign: 'middle', marginRight: '4px'}}>edit</span> Update Status / NRC Name</>}
                 </button>
               </div>
             );

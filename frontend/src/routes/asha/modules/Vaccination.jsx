@@ -43,5 +43,6 @@ export default function Vaccination() {
     collectionName="vaccinations"
     moduleName="vaccination"
     fields={FIELDS}
+    aadhaarPersonLabel="Child / बालक"
   />;
 }

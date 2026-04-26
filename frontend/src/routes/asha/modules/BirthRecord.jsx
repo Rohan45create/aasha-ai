@@ -37,5 +37,6 @@ export default function BirthRecord() {
     collectionName="birth_records"
     moduleName="birth_record"
     fields={FIELDS}
+    aadhaarPersonLabel="Mother / आई"
   />;
 }

@@ -103,7 +103,7 @@ const CoverageMap = () => {
     <div className="p-4 md:p-8">
       <h1 className="text-2xl md:text-3xl font-bold mb-6">Coverage Map</h1>
       <div className="bg-[#FFF8E1] border border-[#FFCA28] rounded-2xl p-6">
-        <p className="text-[#5D4037] font-medium">⚠️ Map failed to load: {loadError}</p>
+        <p className="text-[#5D4037] font-medium flex items-center gap-1"><span className="material-symbols-outlined text-[20px]">warning</span> Map failed to load: {loadError}</p>
         <p className="text-sm text-gray-600 mt-2">Check your <code>VITE_GOOGLE_MAPS_API_KEY</code> in .env.local</p>
         {/* Still show village summary cards without the map */}
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

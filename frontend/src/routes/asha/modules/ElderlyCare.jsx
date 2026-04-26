@@ -27,6 +27,7 @@ export default function ElderlyCare() {
       collectionName="elderly_care"
       moduleName="elderly_care"
       fields={fields}
+      aadhaarPersonLabel="Elderly Person / वृद्ध"
     />
   );
 }

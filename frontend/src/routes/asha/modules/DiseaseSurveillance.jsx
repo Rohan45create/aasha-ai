@@ -26,6 +26,7 @@ export default function DiseaseSurveillance() {
       collectionName="disease_alerts"
       moduleName="disease_surveillance"
       fields={fields}
+      aadhaarPersonLabel="Patient / रुग्ण"
     />
   );
 }

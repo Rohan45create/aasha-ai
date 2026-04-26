@@ -31,5 +31,6 @@ export default function ANCRegistration() {
     collectionName="pregnancies"
     moduleName="anc"
     fields={FIELDS}
+    aadhaarPersonLabel="Mother / गर्भवती"
   />;
 }

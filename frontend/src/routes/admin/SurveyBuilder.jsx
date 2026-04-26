@@ -103,7 +103,7 @@ export default function SurveyBuilder() {
         body: JSON.stringify({ title, fields, headId, assignedTo: 'all', createdBy: user?.uid })
       });
       if (response.ok) {
-        alert('✓ Survey published to all workers!');
+        alert('Survey published to all workers!');
         setTitle('');
         setFields([]);
         setExpandedField(null);
@@ -257,7 +257,7 @@ export default function SurveyBuilder() {
       )}
 
       {/* Auto-translate hint */}
-      <p className="text-[10px] text-[#1D9E75] italic">💡 Blur the English label to auto-translate to Marathi & Hindi</p>
+      <p className="text-[10px] text-[#1D9E75] italic flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">lightbulb</span> Blur the English label to auto-translate to Marathi & Hindi</p>
     </div>
   );
 
@@ -383,15 +383,15 @@ export default function SurveyBuilder() {
               {f.type === 'number' && <div className="mt-1 h-7 bg-gray-100 rounded-lg text-[9px] text-gray-400 flex items-center px-2">0 {f.unit}</div>}
               {f.type === 'boolean' && <div className="mt-1 flex gap-2"><span className="text-[9px] bg-[#EAF3DE] text-[#085041] px-2 py-1 rounded">Yes</span><span className="text-[9px] bg-gray-100 text-gray-500 px-2 py-1 rounded">No</span></div>}
               {f.type === 'select' && <div className="mt-1 h-7 bg-gray-100 rounded-lg text-[9px] text-gray-400 flex items-center px-2">Select…</div>}
-              {f.type === 'date' && <div className="mt-1 h-7 bg-gray-100 rounded-lg text-[9px] text-gray-400 flex items-center px-2">📅 Pick date</div>}
-              {f.type === 'gps' && <div className="mt-1 h-7 bg-gray-100 rounded-lg text-[9px] text-gray-400 flex items-center px-2">📍 Capture location</div>}
-              {f.type === 'photo' && <div className="mt-1 h-7 bg-gray-100 rounded-lg text-[9px] text-gray-400 flex items-center px-2">📷 Take photo</div>}
+              {f.type === 'date' && <div className="mt-1 h-7 bg-gray-100 rounded-lg text-[9px] text-gray-400 flex items-center px-2 gap-1"><span className="material-symbols-outlined text-[12px]">calendar_today</span> Pick date</div>}
+              {f.type === 'gps' && <div className="mt-1 h-7 bg-gray-100 rounded-lg text-[9px] text-gray-400 flex items-center px-2 gap-1"><span className="material-symbols-outlined text-[12px]">location_on</span> Capture location</div>}
+              {f.type === 'photo' && <div className="mt-1 h-7 bg-gray-100 rounded-lg text-[9px] text-gray-400 flex items-center px-2 gap-1"><span className="material-symbols-outlined text-[12px]">photo_camera</span> Take photo</div>}
             </div>
           ))}
           {fields.length === 0 && <p className="text-[10px] text-gray-400">Add fields to preview</p>}
         </div>
         <div className="mt-4 text-[10px] text-[#5F5E5A] bg-[#EAF3DE] rounded-lg p-3 border border-[#1D9E75]">
-          <p className="font-bold text-[#085041] mb-1">📌 Publish Info</p>
+          <p className="font-bold text-[#085041] mb-1 flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">push_pin</span> Publish Info</p>
           <p>This survey will be auto-assigned to <strong>all ASHA workers</strong> under your account.</p>
         </div>
       </div>

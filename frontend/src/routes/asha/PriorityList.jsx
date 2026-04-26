@@ -9,10 +9,10 @@ import {
 
 // ─── Risk colour config ───────────────────────────────────────────────────────
 const RISK_CONFIG = {
-  CRITICAL: { color: '#E24B4A', bg: '#FCEBEB', border: '#E24B4A', dot: '🔴', label: 'CRITICAL' },
-  HIGH:     { color: '#BA7517', bg: '#FAEEDA', border: '#BA7517', dot: '🟡', label: 'HIGH' },
-  MEDIUM:   { color: '#185FA5', bg: '#E6F1FB', border: '#185FA5', dot: '🔵', label: 'MEDIUM' },
-  LOW:      { color: '#27500A', bg: '#EAF3DE', border: '#1D9E75', dot: '🟢', label: 'LOW' },
+  CRITICAL: { color: '#E24B4A', bg: '#FCEBEB', border: '#E24B4A', dot: <span className="material-symbols-outlined" style={{color: '#E24B4A'}}>error</span>, label: 'CRITICAL' },
+  HIGH:     { color: '#BA7517', bg: '#FAEEDA', border: '#BA7517', dot: <span className="material-symbols-outlined" style={{color: '#BA7517'}}>warning</span>, label: 'HIGH' },
+  MEDIUM:   { color: '#185FA5', bg: '#E6F1FB', border: '#185FA5', dot: <span className="material-symbols-outlined" style={{color: '#185FA5'}}>info</span>, label: 'MEDIUM' },
+  LOW:      { color: '#27500A', bg: '#EAF3DE', border: '#1D9E75', dot: <span className="material-symbols-outlined" style={{color: '#1D9E75'}}>check_circle</span>, label: 'LOW' },
 };
 
 // ─── Detail bottom-sheet for a single priority item ──────────────────────────
@@ -122,12 +122,12 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
           <button
             onClick={onClose}
             style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#888', position: 'absolute', right: '20px', top: '20px' }}
-          >✕</button>
+            ><span className="material-symbols-outlined">close</span></button>
         </div>
 
         {/* Risk badge + name */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <span style={{ fontSize: '28px' }}>{cfg.dot}</span>
+          <span style={{ fontSize: '28px', display: 'flex', alignItems: 'center' }}>{cfg.dot}</span>
           <div>
             <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1A1A18' }}>{item.name}</h2>
             <p style={{ fontSize: '13px', color: '#777' }}>
@@ -197,7 +197,7 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
             background: '#FCEBEB', borderRadius: '10px', padding: '10px 14px',
             marginBottom: '20px', border: '1px solid #E24B4A33',
           }}>
-            <span style={{ fontSize: '18px' }}>⚠️</span>
+            <span className="material-symbols-outlined text-[#E24B4A]">warning</span>
             <p style={{ fontSize: '13px', color: '#E24B4A', fontWeight: '600' }}>
               Immediate referral to NRC required for specialised care
             </p>
@@ -216,7 +216,7 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
             borderRadius: '14px', padding: '16px',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
           }}>
-            <span style={{ fontSize: '20px' }}>✅</span>
+            <span className="material-symbols-outlined text-[#1D9E75] text-[24px]">check_circle</span>
             <div>
               <p style={{ fontWeight: '700', color: '#085041', fontSize: '15px' }}>NRC Referral Sent</p>
               <p style={{ fontSize: '12px', color: '#555' }}>Awaiting admin review</p>
@@ -242,9 +242,9 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
             }}
           >
             {sending ? (
-              <><span>⏳</span> Sending Referral…</>
+              <><span className="material-symbols-outlined animate-spin mr-1">autorenew</span> Sending Referral…</>
             ) : (
-              <><span>🏥</span> Generate NRC Referral →</>
+              <><span className="material-symbols-outlined mr-1">local_hospital</span> Generate NRC Referral →</>
             )}
           </button>
         ) : (
@@ -421,7 +421,11 @@ const PriorityList = () => {
           <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1A1A18' }}>Today's Priority Visits</h2>
           {source && (
             <p style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>
-              {source === 'firestore' ? '📦 From Firestore (direct)' : '🤖 From Risk Engine'}
+              {source === 'firestore' ? (
+                <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">inventory_2</span> From Firestore (direct)</span>
+              ) : (
+                <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">smart_toy</span> From Risk Engine</span>
+              )}
             </p>
           )}
         </div>
@@ -436,14 +440,14 @@ const PriorityList = () => {
             fontWeight: '600', opacity: (calculating || loading) ? 0.6 : 1,
           }}
         >
-          🔄 {calculating ? 'Calculating…' : 'Refresh'}
+          <span className={`material-symbols-outlined text-[16px] ${calculating ? 'animate-spin' : ''}`}>sync</span> {calculating ? 'Calculating…' : 'Refresh'}
         </button>
       </div>
 
       {/* Empty state */}
       {items.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#666' }}>
-          <p style={{ fontSize: '40px', marginBottom: '12px' }}>🏥</p>
+          <p style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}><span className="material-symbols-outlined text-[48px] text-gray-400">local_hospital</span></p>
           <p style={{ fontWeight: '600' }}>No priority visits today</p>
           <p style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>All children in your area are healthy!</p>
           <button
@@ -456,7 +460,9 @@ const PriorityList = () => {
               fontWeight: '600', opacity: calculating ? 0.6 : 1,
             }}
           >
-            {calculating ? '⏳ Calculating…' : 'Calculate Risk Scores Now'}
+            {calculating ? (
+               <><span className="material-symbols-outlined text-[16px] animate-spin mr-1 align-middle">autorenew</span> Calculating…</>
+            ) : 'Calculate Risk Scores Now'}
           </button>
         </div>
       ) : (
@@ -484,15 +490,15 @@ const PriorityList = () => {
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
                     <p style={{ fontWeight: '700', fontSize: '15px', color: '#1a1a1a' }}>
-                      {cfg.dot} {item.name}
+                      <span className="mr-1 inline-flex items-center align-middle">{cfg.dot}</span> {item.name}
                     </p>
                     {item._referralSent && (
                       <span style={{
                         fontSize: '10px', fontWeight: '700',
                         background: '#EAF3DE', color: '#085041',
-                        border: '1px solid #1D9E75',
                         padding: '1px 6px', borderRadius: '8px',
-                      }}>✓ Referred</span>
+                        display: 'inline-flex', alignItems: 'center', gap: '2px'
+                      }}><span className="material-symbols-outlined text-[12px]">check</span> Referred</span>
                     )}
                   </div>
                   <p style={{ fontSize: '12px', color: '#555' }}>

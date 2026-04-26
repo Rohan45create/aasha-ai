@@ -74,7 +74,7 @@ export default function AskAshaAI() {
 
   const onVoiceTranscription = (fields, transcript) => {
     if (transcript) {
-       setMessages(prev => [...prev, { role: 'user', content: `🎤 ${transcript}`, timestamp: Date.now() }]);
+       setMessages(prev => [...prev, { role: 'user', content: transcript, isVoice: true, timestamp: Date.now() }]);
        sendToChatAPI(transcript);
     }
   };
@@ -106,6 +106,7 @@ export default function AskAshaAI() {
         {messages.map((m, i) => (
            <div key={i} className={`flex flex-col ${m.role === 'ai' ? 'items-start' : 'items-end'}`}>
               <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed shadow-sm ${m.role === 'ai' ? (m.isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-white border border-gray-200 text-gray-800 rounded-tl-sm') : 'bg-[#1D9E75] text-white rounded-tr-sm'}`}>
+                 {m.isVoice && <span className="material-symbols-outlined text-[16px] align-middle mr-1">mic</span>}
                  {m.content}
                  {m.isError && (
                     <button onClick={handleRetry} className="mt-2 text-sm font-bold block hover:underline text-red-600">

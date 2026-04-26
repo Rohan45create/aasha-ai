@@ -15,9 +15,9 @@ const FIELDS = [
   { id: 'height_cm', label: 'Height (cm)', type: 'number', required: true, placeholder: 'e.g. 72' },
   { id: 'muac_cm', label: 'MUAC (cm)', type: 'number', placeholder: 'e.g. 13.5' },
   { id: 'muac_color', label: 'MUAC Color Zone', type: 'select', options: [
-    { value: 'GREEN', label: '🟢 Green (≥13.5cm — Normal)' },
-    { value: 'YELLOW', label: '🟡 Yellow (12.5-13.4cm — MAM)' },
-    { value: 'RED', label: '🔴 Red (<12.5cm — SAM)' }
+    { value: 'GREEN', label: 'Green (≥13.5cm — Normal)' },
+    { value: 'YELLOW', label: 'Yellow (12.5-13.4cm — MAM)' },
+    { value: 'RED', label: 'Red (<12.5cm — SAM)' }
   ]},
   { id: 'malnutritionGrade', label: 'AI Visual Malnutrition Grade', type: 'select', options: [
     { value: 'NORMAL', label: 'Normal' },
@@ -122,7 +122,7 @@ export default function ChildGrowth() {
       // Notification for head
       await addDoc(collection(db, 'notifications'), {
         userId: 'head_sunita_001',
-        title: `🚨 CRITICAL: ${childName}`,
+        title: `CRITICAL: ${childName}`,
         message: `SAM detected. NRC referral created. ASHA: ${user.displayName || 'ASHA'}`,
         type: 'critical_alert', 
         isRead: false, 
@@ -198,6 +198,7 @@ export default function ChildGrowth() {
         moduleName="child_growth"
         fields={FIELDS}
         onFormChange={setPrefillData}
+        aadhaarPersonLabel="Child / बालक"
       />
     </div>
   );

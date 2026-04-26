@@ -172,7 +172,7 @@ export default React.memo(function WorkerManagement() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Failed to add worker');
 
-      alert(`✓ ${data.name} added successfully`);
+      alert(`${data.name} added successfully`);
       setFormData({ name: '', phone: '', village: '', district: 'Beed' });
       setShowAddPanel(false);
       loadWorkers(); // Refresh from Firestore

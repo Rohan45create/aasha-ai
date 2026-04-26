@@ -48,7 +48,7 @@ export default function PendingReview() {
       );
 
       if (response.ok) {
-        alert('✓ Approved and saved');
+        alert('Approved and saved');
         setReviews(prev => prev.filter(r => r.id !== selectedReview.id));
         setSelectedReview(null);
       }
@@ -78,7 +78,7 @@ export default function PendingReview() {
       );
 
       if (response.ok) {
-        alert('✓ Rejected');
+        alert('Rejected');
         setReviews(prev => prev.filter(r => r.id !== selectedReview.id));
         setSelectedReview(null);
         setRejectionReason('');

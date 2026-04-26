@@ -30,5 +30,6 @@ export default function VillageHealth() {
     collectionName="village_health"
     moduleName="village_health"
     fields={FIELDS}
+    showAadhaar={false}
   />;
 }

@@ -101,10 +101,10 @@ const AadhaarInput = ({ memberIndex, memberName, onAadhaarScanned }) => {
       <p className="text-sm font-medium text-gray-700 mb-3">Aadhaar for {memberName || `Member ${memberIndex + 1}`}</p>
       <div className="flex flex-col gap-2">
         <button type="button" onClick={startCamera} className="w-full py-2 bg-blue-50 text-blue-700 rounded-lg flex items-center justify-center gap-2 font-medium hover:bg-blue-100 transition-colors">
-          <span className="text-lg">📷</span> Scan Aadhaar QR
+          <span className="material-symbols-outlined text-[20px] align-middle">qr_code_scanner</span> Scan Aadhaar QR
         </button>
         <button type="button" onClick={() => setMode('manual')} className="w-full py-2 bg-gray-100 text-gray-700 rounded-lg flex items-center justify-center gap-2 font-medium hover:bg-gray-200 transition-colors">
-          <span className="text-lg">✏️</span> Enter Manually
+          <span className="material-symbols-outlined text-[20px] align-middle">edit</span> Enter Manually
         </button>
         <button type="button" onClick={() => onAadhaarScanned(null)} className="w-full py-2 text-gray-500 font-medium mt-1">
           Skip for now
@@ -146,7 +146,7 @@ const AadhaarInput = ({ memberIndex, memberName, onAadhaarScanned }) => {
   if (mode === 'confirmed') return (
     <div className="p-4 bg-green-50 rounded-xl border border-green-200 flex justify-between items-center">
       <div className="flex items-center gap-2 text-green-700 font-medium">
-        <span>✓</span>
+        <span className="material-symbols-outlined text-[20px]">check_circle</span>
         <span className="font-mono tracking-wider">{masked}</span>
       </div>
       <button type="button" onClick={() => setMode('choose')} className="text-sm text-blue-600 font-medium hover:underline">

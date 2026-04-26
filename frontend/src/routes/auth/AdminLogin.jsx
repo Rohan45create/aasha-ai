@@ -173,7 +173,7 @@ export default function AdminLogin() {
 
           {/* Demo Credentials */}
           <div className="mt-6 bg-[#EAF3DE] border border-[#1D9E75] rounded-xl p-4">
-            <p className="text-xs font-bold text-[#27500A] mb-2">🔑 Demo Credentials</p>
+            <p className="text-xs font-bold text-[#27500A] mb-2"><span className="material-symbols-outlined text-[16px] align-middle mr-1">key</span> Demo Credentials</p>
             <p className="text-xs text-[#27500A] font-mono">Email: admin@asha.gov.in</p>
             <p className="text-xs text-[#27500A] font-mono mt-1">Password: Admin@123</p>
             <p className="text-xs text-[#5F5E5A] mt-2">Create this account in Firebase Console → Authentication → Users</p>

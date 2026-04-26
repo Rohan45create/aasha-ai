@@ -38,6 +38,7 @@ export default function Sanitation() {
       collectionName="sanitation_surveys"
       moduleName="sanitation"
       fields={fields}
+      aadhaarPersonLabel="Household Head / कुटुंब प्रमुख"
     />
   );
 }

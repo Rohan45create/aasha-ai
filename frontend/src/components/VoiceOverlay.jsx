@@ -55,13 +55,13 @@ const VoiceOverlay = ({ moduleType = 'family_survey', formFields = [], onFieldsF
       `}</style>
 
       {/* Status text */}
-      <p style={{ color: 'white', fontSize: '17px', fontWeight: '600', marginBottom: '8px', textAlign: 'center', maxWidth: '300px' }}>
-        {state === 'idle'       && '🎙️ Tap the mic to start speaking'}
-        {state === 'recording'  && '🎤 Listening… speak in Marathi or Hindi'}
-        {state === 'processing' && '⏳ Processing your voice…'}
-        {state === 'done'       && `✅ ${detectedCount} field${detectedCount !== 1 ? 's' : ''} filled from your voice`}
-        {state === 'error'      && `❌ ${errorMsg}`}
-      </p>
+      <div style={{ color: 'white', fontSize: '17px', fontWeight: '600', marginBottom: '8px', textAlign: 'center', maxWidth: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+        {state === 'idle'       && <><span className="material-symbols-outlined" style={{fontSize:'20px'}}>mic_none</span> Tap the mic to start speaking</>}
+        {state === 'recording'  && <><span className="material-symbols-outlined" style={{fontSize:'20px'}}>mic</span> Listening… speak in Marathi or Hindi</>}
+        {state === 'processing' && <><span className="material-symbols-outlined" style={{fontSize:'20px'}}>hourglass_empty</span> Processing your voice…</>}
+        {state === 'done'       && <><span className="material-symbols-outlined" style={{fontSize:'20px'}}>check_circle</span> {`${detectedCount} field${detectedCount !== 1 ? 's' : ''} filled from your voice`}</>}
+        {state === 'error'      && <><span className="material-symbols-outlined" style={{fontSize:'20px'}}>error</span> {errorMsg}</>}
+      </div>
 
       {/* Transcript preview */}
       {transcript ? (
@@ -95,7 +95,7 @@ const VoiceOverlay = ({ moduleType = 'family_survey', formFields = [], onFieldsF
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            🎤
+            <span className="material-symbols-outlined" style={{fontSize:'32px'}}>mic</span>
           </button>
         )}
 
@@ -112,7 +112,7 @@ const VoiceOverlay = ({ moduleType = 'family_survey', formFields = [], onFieldsF
               animation: 'pulse 1.2s ease-in-out infinite',
             }}
           >
-            ⏹
+            <span className="material-symbols-outlined" style={{fontSize:'32px'}}>stop</span>
           </button>
         )}
 
@@ -123,7 +123,7 @@ const VoiceOverlay = ({ moduleType = 'family_survey', formFields = [], onFieldsF
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '28px',
           }}>
-            ⏳
+            <span className="material-symbols-outlined" style={{fontSize:'32px'}}>hourglass_empty</span>
           </div>
         )}
 
@@ -138,7 +138,7 @@ const VoiceOverlay = ({ moduleType = 'family_survey', formFields = [], onFieldsF
                 color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '500',
               }}
             >
-              🔄 Try Again
+              <span className="material-symbols-outlined" style={{fontSize: '18px', verticalAlign: 'middle', marginRight: '4px'}}>refresh</span> Try Again
             </button>
             <button
               onClick={onClose}
@@ -149,7 +149,7 @@ const VoiceOverlay = ({ moduleType = 'family_survey', formFields = [], onFieldsF
                 color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: '600',
               }}
             >
-              {state === 'done' ? 'Review Form ✓' : 'Close'}
+              {state === 'done' ? <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>Review Form <span className="material-symbols-outlined" style={{fontSize: '18px'}}>done</span></span> : 'Close'}
             </button>
           </>
         )}

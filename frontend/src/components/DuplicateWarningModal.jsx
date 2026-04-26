@@ -13,7 +13,7 @@ const DuplicateWarningModal = ({ existingRecord, onUpdate, onSkip, onClose }) =>
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
         <h3 className="text-xl font-bold text-amber-600 mb-4 flex items-center gap-2">
-          <span className="text-2xl">⚠️</span> Person Already in Records
+          <span className="material-symbols-outlined text-3xl">warning</span> Person Already in Records
         </h3>
         
         <div className="bg-amber-50 rounded-xl p-4 border border-amber-100 mb-6 space-y-2">
