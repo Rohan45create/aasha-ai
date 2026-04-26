@@ -14,12 +14,13 @@ export default function AdminLayout() {
   };
 
   const navItems = [
-    { path: '/admin/dashboard', icon: 'dashboard', label: 'Dashboard' },
-    { path: '/admin/workers', icon: 'group', label: 'Workers' },
-    { path: '/admin/review', icon: 'pending_actions', label: 'Pending Review' },
-    { path: '/admin/builder', icon: 'build', label: 'Survey Builder' },
-    { path: '/admin/map', icon: 'map', label: 'Coverage Map' },
-    { path: '/admin/reports', icon: 'description', label: 'Reports' },
+    { path: '/admin/dashboard', icon: 'dashboard',        label: 'Dashboard' },
+    { path: '/admin/workers',   icon: 'group',             label: 'Workers' },
+    { path: '/admin/referrals', icon: 'local_hospital',    label: 'NRC Referrals' },
+    { path: '/admin/review',    icon: 'pending_actions',   label: 'Pending Review' },
+    { path: '/admin/builder',   icon: 'build',             label: 'Survey Builder' },
+    { path: '/admin/map',       icon: 'map',               label: 'Coverage Map' },
+    { path: '/admin/reports',   icon: 'description',       label: 'Reports' },
   ];
 
   const NavContent = () => (

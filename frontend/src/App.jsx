@@ -38,6 +38,7 @@ const CoverageMap = lazy(() => import('./routes/admin/CoverageMap.jsx'));
 const WorkerManagement = lazy(() => import('./routes/admin/WorkerManagement.jsx'));
 const PendingReview = lazy(() => import('./routes/admin/PendingReview.jsx'));
 const Reports = lazy(() => import('./routes/admin/Reports.jsx'));
+const AdminReferrals = lazy(() => import('./routes/admin/Referrals.jsx'));
 
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
@@ -233,6 +234,7 @@ const App = () => {
             <Route path="/admin/builder" element={<SurveyBuilder />} />
             <Route path="/admin/map" element={<CoverageMap />} />
             <Route path="/admin/reports" element={<Reports />} />
+            <Route path="/admin/referrals" element={<AdminReferrals />} />
           </Route>
 
           {/* Redirects */}

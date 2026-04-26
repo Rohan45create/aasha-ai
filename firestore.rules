@@ -196,5 +196,16 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
     }
+
+    // ==========================================
+    // NRC REFERRALS
+    // ==========================================
+
+    match /nrc_referrals/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
   }
 }
