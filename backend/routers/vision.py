@@ -20,29 +20,42 @@ async def grade_muac_photo(
     user=Depends(verify_firebase_token)
 ):
     """
-    Camera malnutrition grading via Gemini Vision.
-    
-    1. ASHA photographs child's upper arm with MUAC tape
-    2. Gemini Vision analyzes the image for color zone
-    3. Returns grade + recommendation + NRC referral flag
-    
-    Photo is NOT stored — processed in memory only.
+    AI Malnutrition Visual Assessment via Gemini Vision.
+
+    ASHA uploads any photo of the child (no MUAC tape required).
+    Gemini analyzes visible wasting signs, oedema, hair/skin changes.
+
+    Returns:
+      {
+        "status": "success",
+        "grading": {
+          "grade": "NORMAL" | "YELLOW" | "RED",
+          "severity_label": str,
+          "confidence": int (0-100),
+          "explanation": str,
+          "visible_signs": [str],
+          "recommendation": str,
+          "needs_nrc_referral": bool
+        }
+      }
+
+    Photo is processed in memory only — not stored.
     """
-    logger.info("muac_grade_start")
+    logger.info("malnutrition_scan_start", filename=photo.filename)
 
     try:
         image_bytes = await photo.read()
 
         if len(image_bytes) == 0:
-            raise HTTPException(status_code=400, detail="Empty photo")
+            raise HTTPException(status_code=400, detail="Empty photo uploaded")
 
-        if len(image_bytes) > 5_000_000:  # 5MB limit
-            raise HTTPException(status_code=413, detail="Photo too large (max 5MB)")
+        if len(image_bytes) > 10_000_000:  # 10MB limit
+            raise HTTPException(status_code=413, detail="Photo too large (max 10MB)")
 
         mime_type = photo.content_type or "image/jpeg"
         result = GeminiService.grade_muac_photo(image_bytes, mime_type)
 
-        logger.info("muac_grade_complete", grade=result.get("grade"))
+        logger.info("malnutrition_scan_complete", grade=result.get("grade"), confidence=result.get("confidence"))
 
         return {
             "status": "success",
@@ -52,10 +65,11 @@ async def grade_muac_photo(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("muac_grade_error", error=str(e))
-        raise HTTPException(status_code=500, detail="MUAC grading failed")
+        logger.error("malnutrition_scan_error", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Malnutrition scan failed: {str(e)}")
     finally:
         image_bytes = None
+
 
 
 from pydantic import BaseModel

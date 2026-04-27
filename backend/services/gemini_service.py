@@ -6,7 +6,7 @@ import structlog
 
 logger = structlog.get_logger()
 
-MODEL_NAME = "gemini-2.0-flash-001"
+MODEL_NAME = "gemini-2.5-flash"
 _gemini_model = GenerativeModel(MODEL_NAME)
 
 VOICE_PROMPTS = {
@@ -254,28 +254,50 @@ Return ONLY valid JSON. No explanation."""
     @staticmethod
     def grade_muac_photo(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict:
         """
-        Use Gemini Vision to analyze a child's upper arm photo for 
-        malnutrition grading (MUAC tape color assessment).
-        
-        Returns: {"grade": "GREEN"|"YELLOW"|"RED", "muac_cm": float|null, 
-                  "recommendation": str, "confidence": float}
+        Use Gemini Vision to analyze a photo of a child for visible signs of malnutrition.
+        Works with any child photo — does NOT require MUAC tape to be visible.
+
+        Returns:
+        {
+          "grade": "NORMAL" | "YELLOW" | "RED",
+          "severity_label": "Normal" | "Moderate Acute Malnutrition (MAM)" | "Severe Acute Malnutrition (SAM)",
+          "confidence": 0-100,
+          "explanation": str,
+          "visible_signs": [str],
+          "recommendation": str,
+          "needs_nrc_referral": true | false
+        }
         """
-        prompt = """Analyze this photograph of a child's upper arm with a MUAC (Mid-Upper Arm Circumference) measuring tape.
+        prompt = """You are a trained pediatric nutrition expert AI helping ASHA health workers in rural India.
+Analyze this photograph of a child and assess visible signs of malnutrition.
 
-Determine:
-1. The MUAC color zone: GREEN (>=13.5cm, normal), YELLOW (12.5-13.4cm, MAM - Moderate Acute Malnutrition), or RED (<12.5cm, SAM - Severe Acute Malnutrition)
-2. Estimated MUAC measurement in centimeters if visible
-3. Your confidence level (0.0 to 1.0)
-4. Recommended action
+Look for the following visible clinical indicators:
+- Visible wasting: prominent ribs, sunken cheeks, thin limbs, loss of muscle mass
+- Bilateral pitting oedema (swelling of feet/legs — indicates Kwashiorkor / SAM)
+- Hair changes: sparse, discoloured, easily pluckable hair
+- Skin changes: flaky, cracked, peeling skin, or skin lesions
+- Visible MUAC tape color if present (RED < 12.5cm, YELLOW 12.5-13.4cm, GREEN >= 13.5cm)
+- Overall body proportions and visible fat tissue
+- Signs of stunting (small for apparent age)
+- Child's alertness, activity level, facial expression
 
-Return ONLY valid JSON:
+Based on your visual analysis, classify the child's malnutrition status:
+- NORMAL: No visible signs. Child appears healthy with adequate fat and muscle.
+- YELLOW: Moderate Acute Malnutrition (MAM). Some concerning signs visible — mild wasting or borderline MUAC tape.
+- RED: Severe Acute Malnutrition (SAM). Clearly visible severe wasting, oedema, or MUAC tape in red zone. Requires immediate NRC referral.
+
+Return ONLY valid JSON (no explanation outside the JSON):
 {
-  "grade": "GREEN" | "YELLOW" | "RED",
-  "muac_cm": number or null,
-  "confidence": number,
-  "recommendation": "string",
+  "grade": "NORMAL" | "YELLOW" | "RED",
+  "severity_label": "Normal" | "Moderate Acute Malnutrition (MAM)" | "Severe Acute Malnutrition (SAM)",
+  "confidence": <integer 0-100>,
+  "explanation": "<2-3 sentence plain-language explanation of what you observed>",
+  "visible_signs": ["<sign 1>", "<sign 2>"],
+  "recommendation": "<action the ASHA worker should take>",
   "needs_nrc_referral": true | false
-}"""
+}
+
+If the image is too unclear, blurry, or does not show a child, return grade "NORMAL" with confidence 10 and explanation indicating the image quality issue."""
 
         try:
             image_part = Part.from_data(data=image_bytes, mime_type=mime_type)
@@ -284,11 +306,15 @@ Return ONLY valid JSON:
                 generation_config={"response_mime_type": "application/json"},
             )
             result = _parse_json_response(response.text)
-            logger.info("muac_grading_complete", grade=result.get("grade"))
+            # Ensure confidence is an integer percentage
+            if "confidence" in result and isinstance(result["confidence"], float) and result["confidence"] <= 1.0:
+                result["confidence"] = int(result["confidence"] * 100)
+            logger.info("malnutrition_scan_complete", grade=result.get("grade"), confidence=result.get("confidence"))
             return result
         except Exception as e:
-            logger.error("muac_grading_error", error=str(e))
+            logger.error("malnutrition_scan_error", error=str(e))
             raise
+
 
 
     @staticmethod
