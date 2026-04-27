@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuthStore } from '../../stores/authStore';
+import { useTx } from '../../context/TranslationContext';
 
 const FALLBACK_ASHA_IDS = [
   'asha_lata_001', 'asha_priya_002', 'asha_kavita_003',
@@ -21,11 +22,12 @@ const VILLAGE_COORDS = {
 };
 
 const CoverageMap = () => {
-  const [villages, setVillages] = useState([]);
-  const [activeAshas, setActiveAshas] = useState([]);
+  const [villages, setVillages]           = useState([]);
+  const [activeAshas, setActiveAshas]     = useState([]);
   const [selectedVillage, setSelectedVillage] = useState(null);
-  const [loadError, setLoadError] = useState(null);
-  const [mapType, setMapType] = useState('roadmap');
+  const [loadError, setLoadError]         = useState(null);
+  const [mapType, setMapType]             = useState('roadmap');
+  const tx = useTx();
 
   const { headId: storeHeadId } = useAuthStore();
   const headId = storeHeadId || localStorage.getItem('headId') || 'head_sunita_001';
@@ -101,13 +103,12 @@ const CoverageMap = () => {
 
   if (loadError) return (
     <div className="p-4 md:p-8">
-      <h1 className="text-2xl md:text-3xl font-bold mb-6">Coverage Map</h1>
+      <h1 className="text-2xl md:text-3xl font-bold mb-6">{tx('Coverage Map', 'coverage_map')}</h1>
       <div className="bg-[#FFF8E1] border border-[#FFCA28] rounded-2xl p-6">
-        <p className="text-[#5D4037] font-medium flex items-center gap-1"><span className="material-symbols-outlined text-[20px]">warning</span> Map failed to load: {loadError}</p>
-        <p className="text-sm text-gray-600 mt-2">Check your <code>VITE_GOOGLE_MAPS_API_KEY</code> in .env.local</p>
-        {/* Still show village summary cards without the map */}
+        <p className="text-[#5D4037] font-medium flex items-center gap-1"><span className="material-symbols-outlined text-[20px]">warning</span> {tx('Map failed to load')}: {loadError}</p>
+        <p className="text-sm text-gray-600 mt-2">{tx('Check your')} <code>VITE_GOOGLE_MAPS_API_KEY</code> in .env.local</p>
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {villages.map(v => <VillageCard key={v.name} v={v} onClick={() => {}} />)}
+          {villages.map(v => <VillageCard key={v.name} v={v} tx={tx} onClick={() => {}} />)}
         </div>
       </div>
     </div>
@@ -115,7 +116,7 @@ const CoverageMap = () => {
 
   if (!isLoaded) return (
     <div className="p-4 md:p-8">
-      <h1 className="text-2xl md:text-3xl font-bold mb-6">Coverage Map</h1>
+      <h1 className="text-2xl md:text-3xl font-bold mb-6">{tx('Coverage Map', 'coverage_map')}</h1>
       <div className="animate-pulse bg-gray-200 h-96 rounded-2xl" />
     </div>
   );
@@ -123,8 +124,10 @@ const CoverageMap = () => {
   return (
     <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Coverage Map</h1>
-        <span className="text-xs text-[#5F5E5A] bg-gray-100 px-3 py-1 rounded-full">{villages.length} village{villages.length !== 1 ? 's' : ''} tracked</span>
+        <h1 className="text-2xl md:text-3xl font-bold">{tx('Coverage Map', 'coverage_map')}</h1>
+        <span className="text-xs text-[#5F5E5A] bg-gray-100 px-3 py-1 rounded-full">
+          {villages.length} {tx('village')}{villages.length !== 1 ? 's' : ''} {tx('tracked')}
+        </span>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-[#D3D1C7] overflow-hidden mb-6 relative">
@@ -132,10 +135,10 @@ const CoverageMap = () => {
         <button
           onClick={() => setMapType(t => t === 'roadmap' ? 'satellite' : 'roadmap')}
           className="absolute top-3 right-3 z-10 bg-white shadow-md border border-gray-200 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1 hover:bg-gray-50 transition-colors"
-          title="Toggle satellite view"
+          title={tx('Toggle satellite view')}
         >
           <span className="material-symbols-outlined text-sm">{mapType === 'satellite' ? 'map' : 'satellite'}</span>
-          {mapType === 'satellite' ? 'Map' : 'Satellite'}
+          {mapType === 'satellite' ? tx('Map') : tx('Satellite')}
         </button>
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '480px' }}
@@ -187,9 +190,9 @@ const CoverageMap = () => {
                 <strong className="block text-sm mb-1">{selectedVillage.name}</strong>
                 {!selectedVillage.isWorker && (
                   <>
-                    <p className="text-xs text-gray-600">{selectedVillage.total} families</p>
+                    <p className="text-xs text-gray-600">{selectedVillage.total} {tx('families', 'families')}</p>
                     {selectedVillage.critical > 0 && (
-                      <p className="text-xs text-red-600 font-bold">{selectedVillage.critical} critical cases</p>
+                      <p className="text-xs text-red-600 font-bold">{selectedVillage.critical} {tx('critical cases', 'critical_cases')}</p>
                     )}
                   </>
                 )}
@@ -201,26 +204,28 @@ const CoverageMap = () => {
 
       {/* Legend */}
       <div className="flex items-center gap-6 px-4 py-3 bg-gray-50 border-t border-[#D3D1C7] text-xs text-[#5F5E5A]">
-        <span className="font-semibold">Legend:</span>
-        <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-[#1D9E75] inline-block opacity-70"/> Good coverage (≥70%)</span>
-        <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-[#BA7517] inline-block opacity-70"/> Low coverage (&lt;70%)</span>
-        <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-[#E24B4A] inline-block opacity-70"/> Critical cases present</span>
+        <span className="font-semibold">{tx('Legend')}:</span>
+        <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-[#1D9E75] inline-block opacity-70"/> {tx('Good coverage (≥70%)')}</span>
+        <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-[#BA7517] inline-block opacity-70"/> {tx('Low coverage (<70%)')}</span>
+        <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-[#E24B4A] inline-block opacity-70"/> {tx('Critical cases present')}</span>
       </div>
 
       {/* Village Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {villages.length === 0 && (
-          <p className="text-[#5F5E5A] p-4 col-span-3">No household data found. Submit some Family Survey records first, or check that ashaIds match Firestore.</p>
+          <p className="text-[#5F5E5A] p-4 col-span-3">
+            {tx('No household data found. Submit some Family Survey records first, or check that ashaIds match Firestore.')}
+          </p>
         )}
         {villages.map(v => (
-          <VillageCard key={v.name} v={v} onClick={() => setSelectedVillage(v)} />
+          <VillageCard key={v.name} v={v} tx={tx} onClick={() => setSelectedVillage(v)} />
         ))}
       </div>
     </div>
   );
 };
 
-const VillageCard = ({ v, onClick }) => (
+const VillageCard = ({ v, onClick, tx }) => (
   <div
     className="bg-white rounded-2xl p-4 shadow-sm border border-[#D3D1C7] cursor-pointer hover:shadow-md transition-shadow"
     onClick={onClick}
@@ -232,11 +237,11 @@ const VillageCard = ({ v, onClick }) => (
     <div className="grid grid-cols-2 gap-2 text-center">
       <div>
         <p className="text-xl font-bold text-[#085041]">{v.total}</p>
-        <p className="text-[10px] text-[#5F5E5A] uppercase tracking-wide">Families</p>
+        <p className="text-[10px] text-[#5F5E5A] uppercase tracking-wide">{tx ? tx('Families', 'families') : 'Families'}</p>
       </div>
       <div>
         <p className={`text-xl font-bold ${v.critical > 0 ? 'text-[#E24B4A]' : 'text-[#1D9E75]'}`}>{v.critical}</p>
-        <p className="text-[10px] text-[#5F5E5A] uppercase tracking-wide">Critical</p>
+        <p className="text-[10px] text-[#5F5E5A] uppercase tracking-wide">{tx ? tx('Critical', 'critical') : 'Critical'}</p>
       </div>
     </div>
   </div>

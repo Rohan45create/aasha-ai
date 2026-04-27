@@ -5,6 +5,17 @@ import {
   doc, updateDoc, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useTx } from '../../context/TranslationContext';
+
+// Status i18n key map — instant offline translation via JSON
+const STATUS_I18N = {
+  'Pending': 'pending',
+  'Admitted': 'admitted',
+  'Discharged': 'discharged',
+  'Follow-up Due': 'follow_up_due',
+  'Rejected': 'rejected',
+  'All': 'all',
+};
 
 // ─── Status config (matching existing "Pending","Admitted","Discharged","Follow-up Due") ──
 const STATUS_CONFIG = {
@@ -29,6 +40,7 @@ const ReviewModal = ({ referral, onClose }) => {
   const [notes,   setNotes]   = useState(referral.notes   || '');
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState('');
+  const tx = useTx();
 
   const save = async () => {
     setSaving(true);
@@ -91,8 +103,8 @@ const ReviewModal = ({ referral, onClose }) => {
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
           <div>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1A1A18' }}>Review NRC Referral</h3>
-            <p style={{ fontSize: '13px', color: '#777' }}>Submitted by ASHA: <strong>{referral.ashaId}</strong></p>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1A1A18' }}>{tx('Review NRC Referral')}</h3>
+            <p style={{ fontSize: '13px', color: '#777' }}>{tx('Submitted by ASHA')}: <strong>{referral.ashaId}</strong></p>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#888' }}><span className="material-symbols-outlined">close</span></button>
         </div>
@@ -106,7 +118,7 @@ const ReviewModal = ({ referral, onClose }) => {
                 {referral.village && <><span className="material-symbols-outlined text-[14px] align-middle">location_on</span> {referral.village} &middot; </>}Referred: {referral.referredDate || 'N/A'}
               </p>
               <p style={{ fontSize: '13px', color: rCfg.color, fontWeight: '600', marginTop: '6px' }}>
-                {referral.reason}
+                {tx(referral.reason)}
               </p>
             </div>
             {referral.riskLevel && (
@@ -115,7 +127,7 @@ const ReviewModal = ({ referral, onClose }) => {
                   background: rCfg.color, color: '#fff',
                   fontSize: '11px', fontWeight: '700',
                   padding: '3px 10px', borderRadius: '20px',
-                }}>{referral.riskLevel}</span>
+                }}>{tx(referral.riskLevel, referral.riskLevel?.toLowerCase())}</span>
                 {referral.riskScore && (
                   <p style={{ fontSize: '20px', fontWeight: '800', color: rCfg.color, marginTop: '6px' }}>
                     {referral.riskScore}/100
@@ -128,7 +140,7 @@ const ReviewModal = ({ referral, onClose }) => {
 
         {/* NRC Name — admin fills this */}
         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#555', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          <span className="material-symbols-outlined" style={{fontSize: '16px', verticalAlign: 'middle', marginRight: '4px'}}>local_hospital</span> NRC / Facility Name <span style={{ color: '#E24B4A' }}>*</span>
+          <span className="material-symbols-outlined" style={{fontSize: '16px', verticalAlign: 'middle', marginRight: '4px'}}>local_hospital</span> {tx('NRC / Facility Name')} <span style={{ color: '#E24B4A' }}>*</span>
         </label>
         <input
           type="text"
@@ -146,7 +158,7 @@ const ReviewModal = ({ referral, onClose }) => {
 
         {/* Status selector */}
         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#555', marginBottom: '8px', textTransform: 'uppercase' }}>
-          Update Status
+          {tx('Update Status')}
         </label>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
           {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
@@ -167,14 +179,14 @@ const ReviewModal = ({ referral, onClose }) => {
               }}
             >
               <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>{cfg.icon}</span>
-              {cfg.label}
+              {tx(cfg.label, STATUS_I18N[key])}
             </button>
           ))}
         </div>
 
         {/* Notes */}
         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#555', marginBottom: '6px', textTransform: 'uppercase' }}>
-          Notes (optional)
+          {tx('Notes (optional)')}
         </label>
         <textarea
           value={notes}
@@ -215,7 +227,7 @@ const ReviewModal = ({ referral, onClose }) => {
               opacity: saving ? 0.7 : 1,
             }}
           >
-            {saving ? 'Saving…' : <><span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle', marginRight: '4px'}}>{sCfg.icon}</span> Save — {sCfg.label}</>}
+            {saving ? tx('Saving…') : <><span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle', marginRight: '4px'}}>{sCfg.icon}</span> {tx('Save')} — {tx(sCfg.label, STATUS_I18N[status])}</>}
           </button>
         </div>
       </div>
@@ -229,6 +241,7 @@ export default function Referrals() {
   const [loading,   setLoading]   = useState(true);
   const [filter,    setFilter]    = useState('All');
   const [reviewing, setReviewing] = useState(null);
+  const tx = useTx();
 
   const { headId, user } = useAuthStore();
 
@@ -269,17 +282,17 @@ export default function Referrals() {
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#1A1A18' }}>NRC Referrals</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#1A1A18' }}>{tx('NRC Referrals', 'referrals')}</h1>
           {pendingCount > 0 && (
             <span style={{
               background: '#E24B4A', color: '#fff',
               fontSize: '12px', fontWeight: '700',
               padding: '2px 10px', borderRadius: '20px',
-            }}>{pendingCount} pending</span>
+            }}>{pendingCount} {tx('pending', 'pending')}</span>
           )}
         </div>
         <p style={{ fontSize: '13px', color: '#777', marginTop: '4px' }}>
-          Review NRC admission requests from your ASHA workers
+          {tx('Review NRC admission requests from your ASHA workers')}
         </p>
       </div>
 
@@ -303,7 +316,7 @@ export default function Referrals() {
                 transition: 'all 0.15s',
               }}
             >
-              {sCfg ? <><span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle', marginRight: '4px'}}>{sCfg.icon}</span> {f}</> : f} {count > 0 && `(${count})`}
+              {sCfg ? <><span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle', marginRight: '4px'}}>{sCfg.icon}</span> {tx(f, STATUS_I18N[f])}</> : tx(f, STATUS_I18N[f])} {count > 0 && `(${count})`}
             </button>
           );
         })}
@@ -328,10 +341,10 @@ export default function Referrals() {
         }}>
           <span className="material-symbols-outlined" style={{ fontSize: '40px', marginBottom: '12px', color: '#888' }}>assignment</span>
           <p style={{ fontWeight: '600', color: '#1A1A18' }}>
-            No referrals {filter !== 'All' ? `with status "${filter}"` : 'yet'}
+            {tx('No referrals')} {filter !== 'All' ? `${tx('with status')} "${tx(filter, STATUS_I18N[filter])}"` : tx('yet')}
           </p>
           <p style={{ fontSize: '13px', color: '#888', marginTop: '6px' }}>
-            Referrals submitted from the Priority List will appear here
+            {tx('Referrals submitted from the Priority List will appear here')}
           </p>
         </div>
       ) : (
@@ -361,14 +374,14 @@ export default function Referrals() {
                           background: rCfg.bg, color: rCfg.color,
                           fontSize: '10px', fontWeight: '700',
                           padding: '2px 8px', borderRadius: '8px',
-                        }}>{r.riskLevel}</span>
+                        }}>{tx(r.riskLevel, r.riskLevel?.toLowerCase())}</span>
                       )}
                     </div>
                     {r.village && (
                       <p style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}><span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle'}}>location_on</span> {r.village}</p>
                     )}
                     <p style={{ fontSize: '13px', color: rCfg.color || '#555', fontWeight: '600', marginBottom: '4px' }}>
-                      {r.reason}
+                      {tx(r.reason)}
                     </p>
                   </div>
 
@@ -380,7 +393,7 @@ export default function Referrals() {
                       padding: '4px 10px', borderRadius: '20px',
                       display: 'block', marginBottom: '4px', whiteSpace: 'nowrap',
                     }}>
-                      <span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle', marginRight: '4px'}}>{sCfg.icon}</span> {r.status}
+                      <span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle', marginRight: '4px'}}>{sCfg.icon}</span> {tx(r.status, STATUS_I18N[r.status])}
                     </span>
                     <p style={{ fontSize: '10px', color: '#aaa' }}>
                       {r.referredDate || (r.createdAt?.toDate?.()?.toLocaleDateString('en-IN', {day:'numeric',month:'short'}) || '')}
@@ -407,7 +420,7 @@ export default function Referrals() {
                     padding: '8px 12px', marginBottom: '12px',
                     fontSize: '12px', color: '#666',
                   }}>
-                    <span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle'}}>edit_note</span> {r.notes}
+                    <span className="material-symbols-outlined" style={{fontSize: '14px', verticalAlign: 'middle'}}>edit_note</span> {r.notes ? tx(r.notes) : ''}
                   </div>
                 )}
 
@@ -424,7 +437,7 @@ export default function Referrals() {
                     transition: 'all 0.15s',
                   }}
                 >
-                  {r.status === 'Pending' ? <><span className="material-symbols-outlined" style={{fontSize: '16px', verticalAlign: 'middle', marginRight: '4px'}}>edit_document</span> Review & Assign NRC</> : <><span className="material-symbols-outlined" style={{fontSize: '16px', verticalAlign: 'middle', marginRight: '4px'}}>edit</span> Update Status / NRC Name</>}
+                  {r.status === 'Pending' ? <><span className="material-symbols-outlined" style={{fontSize: '16px', verticalAlign: 'middle', marginRight: '4px'}}>edit_document</span> {tx('Review & Assign NRC')}</> : <><span className="material-symbols-outlined" style={{fontSize: '16px', verticalAlign: 'middle', marginRight: '4px'}}>edit</span> {tx('Update Status / NRC Name')}</>}
                 </button>
               </div>
             );

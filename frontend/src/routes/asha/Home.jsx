@@ -4,9 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/authStore';
 import { db } from '../../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { useTx } from '../../context/TranslationContext';
 
 export default React.memo(function Home() {
   const { t } = useTranslation();
+  const tx = useTx();
   const { user, ashaId: storeAshaId } = useAuthStore();
   const [stats, setStats] = useState({ families: 0, highRisk: 0, pendingVisits: 0 });
   const [loading, setLoading] = useState(true);
@@ -74,20 +76,20 @@ export default React.memo(function Home() {
         <h2 className="text-xl font-bold text-[#1A1A18] mb-1">
           {'\u0928\u092E\u0938\u094D\u0915\u093E\u0930'}, {user?.displayName || 'ASHA'}!
         </h2>
-        <p className="text-[#5F5E5A] text-sm">Today is a good day to make a difference.</p>
+        <p className="text-[#5F5E5A] text-sm">{tx('Today is a good day to make a difference.')}</p>
         
         <div className="grid grid-cols-3 gap-3 mt-5">
           <div className="bg-[#EAF3DE] p-3 rounded-xl text-center">
             <span className="block text-2xl font-bold text-[#085041]">{loading ? '-' : stats.families}</span>
-            <span className="text-[10px] font-medium text-[#1D9E75] uppercase">Families</span>
+            <span className="text-[10px] font-medium text-[#1D9E75] uppercase">{tx('Families')}</span>
           </div>
           <div className="bg-[#FCEBEB] p-3 rounded-xl text-center">
             <span className="block text-2xl font-bold text-[#791F1F]">{loading ? '-' : stats.highRisk}</span>
-            <span className="text-[10px] font-medium text-[#E24B4A] uppercase">High Risk</span>
+            <span className="text-[10px] font-medium text-[#E24B4A] uppercase">{tx('High Risk')}</span>
           </div>
           <div className="bg-[#F3E5F5] p-3 rounded-xl text-center">
             <span className="block text-2xl font-bold text-[#6A1B9A]">{loading ? '-' : stats.pendingVisits}</span>
-            <span className="text-[10px] font-medium text-[#AB47BC] uppercase">Visits</span>
+            <span className="text-[10px] font-medium text-[#AB47BC] uppercase">{tx('Visits')}</span>
           </div>
         </div>
       </div>
@@ -97,7 +99,7 @@ export default React.memo(function Home() {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-bold text-lg">{t('import_register')}</h3>
-            <p className="text-xs opacity-90 mt-1">Scan handwritten logs using Vision AI</p>
+            <p className="text-xs opacity-90 mt-1">{tx('Scan handwritten logs using Vision AI')}</p>
           </div>
           <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
             <span className="material-symbols-outlined">document_scanner</span>

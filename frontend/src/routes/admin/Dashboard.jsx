@@ -5,6 +5,7 @@ import {
   collection, query, where,
   getDoc, doc, getDocs
 } from 'firebase/firestore';
+import { useTx } from '../../context/TranslationContext';
 
 const FALLBACK_ASHA_IDS = [
   'asha_lata_001', 'asha_priya_002', 'asha_kavita_003',
@@ -117,6 +118,7 @@ function MiniBarChart({ data, title }) {
 // ── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
+  const tx = useTx();
   const [stats, setStats] = useState({
     workerCount: 0,
     activeToday: 0,
@@ -265,19 +267,19 @@ export default function AdminDashboard() {
 
 
   const cards = [
-    { label: 'ASHA Workers', value: stats.workerCount, icon: 'group', color: 'text-[#085041]', bg: 'bg-[#EAF3DE]' },
-    { label: 'Active Today', value: stats.activeToday, icon: 'bolt', color: 'text-[#1565C0]', bg: 'bg-[#E3F2FD]' },
-    { label: 'Total Families', value: stats.totalFamilies, icon: 'family_restroom', color: 'text-[#6A1B9A]', bg: 'bg-[#F3E5F5]' },
-    { label: 'Critical Cases', value: stats.criticalCases, icon: 'warning', color: 'text-[#E24B4A]', bg: 'bg-[#FCEBEB]' },
-    { label: 'Pending Reviews', value: stats.pendingReviews, icon: 'pending_actions', color: 'text-[#BA7517]', bg: 'bg-[#FFF8E1]' },
+    { label: tx('ASHA Workers', 'total_workers'), value: stats.workerCount, icon: 'group', color: 'text-[#085041]', bg: 'bg-[#EAF3DE]' },
+    { label: tx('Active Today'), value: stats.activeToday, icon: 'bolt', color: 'text-[#1565C0]', bg: 'bg-[#E3F2FD]' },
+    { label: tx('Total Families', 'total_families'), value: stats.totalFamilies, icon: 'family_restroom', color: 'text-[#6A1B9A]', bg: 'bg-[#F3E5F5]' },
+    { label: tx('Critical Cases', 'critical_cases'), value: stats.criticalCases, icon: 'warning', color: 'text-[#E24B4A]', bg: 'bg-[#FCEBEB]' },
+    { label: tx('Pending Reviews', 'pending_reviews'), value: stats.pendingReviews, icon: 'pending_actions', color: 'text-[#BA7517]', bg: 'bg-[#FFF8E1]' },
   ];
 
   if (loading) {
     return (
       <div className="p-4 md:p-8">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold">Admin Dashboard</h1>
-          <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full animate-pulse">Loading data…</span>
+          <h1 className="text-2xl md:text-3xl font-bold">{tx('Admin Dashboard', 'admin_dashboard')}</h1>
+          <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full animate-pulse">{tx('Loading data…', 'loading')}</span>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8 animate-pulse">
           {[...Array(5)].map((_, i) => (<div key={i} className="h-28 bg-gray-200 rounded-2xl" />))}
@@ -289,7 +291,7 @@ export default function AdminDashboard() {
   return (
     <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Admin Dashboard</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">{tx('Admin Dashboard', 'admin_dashboard')}</h1>
         <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full font-mono">
           {headId}
         </span>
@@ -318,8 +320,8 @@ export default function AdminDashboard() {
             <HorizontalBarChart data={moduleChart} title="Survey Submissions by Module" />
           ) : (
             <div>
-              <h3 className="text-sm font-semibold text-[#5F5E5A] mb-3 uppercase tracking-wide">Survey Submissions by Module</h3>
-              <p className="text-sm text-gray-400 text-center py-4">No submissions yet</p>
+              <h3 className="text-sm font-semibold text-[#5F5E5A] mb-3 uppercase tracking-wide">{tx('Survey Submissions by Module')}</h3>
+              <p className="text-sm text-gray-400 text-center py-4">{tx('No submissions yet')}</p>
             </div>
           )}
         </div>
@@ -344,13 +346,13 @@ export default function AdminDashboard() {
       <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-[#D3D1C7]">
         <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
           <span className="material-symbols-outlined text-[#E24B4A]">notifications_active</span>
-          System Alerts
+          {tx('System Alerts')}
         </h2>
         <div className="space-y-3">
           {alerts.length === 0 ? (
             <div className="p-4 bg-[#EAF3DE] text-[#085041] rounded-xl font-medium border border-[#1D9E75] text-sm flex items-center gap-2">
               <span className="material-symbols-outlined text-lg">check_circle</span>
-              All systems nominal. No critical cases.
+              {tx('All systems nominal. No critical cases.')}
             </div>
           ) : (
             alerts.map(a => (
@@ -362,7 +364,7 @@ export default function AdminDashboard() {
           )}
           <div className="p-4 bg-gray-50 text-gray-600 rounded-xl text-sm flex items-center gap-2 border border-gray-200">
             <span className="material-symbols-outlined text-lg text-gray-400">schedule</span>
-            Nightly risk engine last ran at 02:30 AM
+            {tx('Nightly risk engine last ran at 02:30 AM')}
           </div>
         </div>
       </div>

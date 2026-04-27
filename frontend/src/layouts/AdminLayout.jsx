@@ -3,24 +3,27 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
+import { useTx } from '../context/TranslationContext';
+import LanguageToggle from '../components/LanguageToggle';
 
 export default function AdminLayout() {
   const { pathname } = useLocation();
   const { user } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const tx = useTx();
 
   const handleLogout = async () => {
     await signOut(auth);
   };
 
   const navItems = [
-    { path: '/admin/dashboard', icon: 'dashboard',        label: 'Dashboard' },
-    { path: '/admin/workers',   icon: 'group',             label: 'Workers' },
-    { path: '/admin/referrals', icon: 'local_hospital',    label: 'NRC Referrals' },
-    { path: '/admin/review',    icon: 'pending_actions',   label: 'Pending Review' },
-    { path: '/admin/builder',   icon: 'build',             label: 'Survey Builder' },
-    { path: '/admin/map',       icon: 'map',               label: 'Coverage Map' },
-    { path: '/admin/reports',   icon: 'description',       label: 'Reports' },
+    { path: '/admin/dashboard', icon: 'dashboard',        labelKey: 'admin_dashboard',   label: 'Dashboard' },
+    { path: '/admin/workers',   icon: 'group',             labelKey: 'worker_management', label: 'Workers' },
+    { path: '/admin/referrals', icon: 'local_hospital',    labelKey: 'referrals',         label: 'NRC Referrals' },
+    { path: '/admin/review',    icon: 'pending_actions',   labelKey: 'pending_review',    label: 'Pending Review' },
+    { path: '/admin/builder',   icon: 'build',             labelKey: 'survey_builder',    label: 'Survey Builder' },
+    { path: '/admin/map',       icon: 'map',               labelKey: 'coverage_map',      label: 'Coverage Map' },
+    { path: '/admin/reports',   icon: 'description',       labelKey: 'reports',           label: 'Reports' },
   ];
 
   const NavContent = () => (
@@ -31,7 +34,7 @@ export default function AdminLayout() {
           <h1 className="text-2xl font-bold">AshaAI</h1> */}
           <img src='/logo.png' alt='Logo' className='w-35 rounded-full' />
         </div>
-        <p className="text-sm opacity-80">Supervisor Portal</p>
+        <p className="text-sm opacity-80">{tx('Supervisor Portal')}</p>
       </div>
       <nav className="flex-1 overflow-y-auto py-4">
         <ul className="space-y-1 px-3">
@@ -45,20 +48,25 @@ export default function AdminLayout() {
                   className={`flex items-center px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-[#1D9E75] font-medium' : 'hover:bg-white/10 opacity-90'}`}
                 >
                   <span className="material-symbols-outlined mr-3 text-xl">{item.icon}</span>
-                  <span className="md:inline">{item.label}</span>
+                  <span className="md:inline">{tx(item.label, item.labelKey)}</span>
                 </Link>
               </li>
             );
           })}
         </ul>
       </nav>
-      <div className="p-4 border-t border-white/10 flex items-center justify-between">
-        <div className="truncate flex-1">
-          <p className="text-sm font-medium">{user?.displayName || 'Admin'}</p>
+      <div className="p-4 border-t border-white/10 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="truncate flex-1">
+            <p className="text-sm font-medium">{user?.displayName || 'Admin'}</p>
+          </div>
+          <button onClick={handleLogout} className="p-2 hover:bg-white/10 rounded-full transition-colors ml-2 flex-shrink-0" title="Logout">
+            <span className="material-symbols-outlined">logout</span>
+          </button>
         </div>
-        <button onClick={handleLogout} className="p-2 hover:bg-white/10 rounded-full transition-colors ml-2 flex-shrink-0" title="Logout">
-          <span className="material-symbols-outlined">logout</span>
-        </button>
+        <div className="flex justify-center bg-black/20 rounded-xl p-1">
+          <LanguageToggle />
+        </div>
       </div>
     </>
   );
@@ -79,13 +87,18 @@ export default function AdminLayout() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile top bar */}
         <header className="md:hidden flex items-center justify-between p-4 bg-[#085041] text-white">
-          <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-white/10 rounded-lg">
-            <span className="material-symbols-outlined">menu</span>
-          </button>
-          <h1 className="text-lg font-bold">AshaAI Admin</h1>
-          <button onClick={handleLogout} className="p-2 hover:bg-white/10 rounded-lg">
-            <span className="material-symbols-outlined">logout</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-white/10 rounded-lg">
+              <span className="material-symbols-outlined">menu</span>
+            </button>
+            <h1 className="text-lg font-bold">AshaAI {tx('Admin', 'admin_dashboard')}</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <button onClick={handleLogout} className="p-2 hover:bg-white/10 rounded-lg">
+              <span className="material-symbols-outlined">logout</span>
+            </button>
+          </div>
         </header>
 
         <main className="flex-1 overflow-auto bg-[#F1EFE8]">

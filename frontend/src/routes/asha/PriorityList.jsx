@@ -6,6 +6,7 @@ import {
   collection, query, where, getDocs,
   addDoc, serverTimestamp, getDoc, doc
 } from 'firebase/firestore';
+import { useTx } from '../../context/TranslationContext';
 
 // ─── Risk colour config ───────────────────────────────────────────────────────
 const RISK_CONFIG = {
@@ -18,6 +19,7 @@ const RISK_CONFIG = {
 // ─── Detail bottom-sheet for a single priority item ──────────────────────────
 const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
   const cfg = RISK_CONFIG[item.risk_level] || RISK_CONFIG.LOW;
+  const tx = useTx();
   const [sending, setSending]     = useState(false);
   const [sent, setSent]           = useState(item._referralSent || false);
   const [referralId, setReferralId] = useState(item._referralId || null);
@@ -188,7 +190,7 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
           <div>
             <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1A1A18' }}>{item.name}</h2>
             <p style={{ fontSize: '13px', color: '#777' }}>
-              {item.type === 'child' ? `${item.age_months} months old` : 'Pregnancy case'}
+              {item.type === 'child' ? `${item.age_months} ${tx('months old', 'months_old')}` : tx('Pregnancy case', 'pregnancy_case')}
             </p>
           </div>
           <span style={{
@@ -196,7 +198,7 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
             background: cfg.color, color: '#fff',
             fontSize: '11px', fontWeight: '700',
             padding: '4px 12px', borderRadius: '20px',
-          }}>{cfg.label}</span>
+          }}>{tx(item.risk_level, item.risk_level?.toLowerCase())}</span>
         </div>
 
         {/* Confidence / risk score bar */}
@@ -205,7 +207,7 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
           padding: '16px', marginBottom: '16px',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', color: '#555', fontWeight: '500' }}>AI Confidence Score</span>
+            <span style={{ fontSize: '13px', color: '#555', fontWeight: '500' }}>{tx('AI Confidence Score')}</span>
             <span style={{ fontSize: '18px', fontWeight: '800', color: scoreColor }}>{item.risk_score}/100</span>
           </div>
           {/* Progress bar */}
@@ -228,8 +230,8 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
           padding: '14px',
           marginBottom: '14px',
         }}>
-          <p style={{ fontSize: '12px', color: '#777', marginBottom: '4px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Primary Finding</p>
-          <p style={{ fontSize: '15px', color: cfg.color, fontWeight: '600' }}>{item.primary_driver || '—'}</p>
+          <p style={{ fontSize: '12px', color: '#777', marginBottom: '4px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{tx('Primary Finding', 'primary_finding')}</p>
+          <p style={{ fontSize: '15px', color: cfg.color, fontWeight: '600' }}>{tx(item.primary_driver) || '—'}</p>
         </div>
 
         {/* Recommended action */}
@@ -239,11 +241,11 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
           padding: '14px',
           marginBottom: '20px',
         }}>
-          <p style={{ fontSize: '12px', color: '#777', marginBottom: '4px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recommended Action</p>
+          <p style={{ fontSize: '12px', color: '#777', marginBottom: '4px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{tx('Recommended Action', 'recommended_action')}</p>
           <p style={{ fontSize: '14px', color: '#1A1A18' }}>
             {item.recommended_action
-              ? `→ ${item.recommended_action}`
-              : '→ Continue regular monitoring'}
+              ? `→ ${tx(item.recommended_action)}`
+              : `→ ${tx('Continue regular monitoring')}`}
           </p>
         </div>
 
@@ -256,7 +258,7 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
           }}>
             <span className="material-symbols-outlined text-[#E24B4A]">warning</span>
             <p style={{ fontSize: '13px', color: '#E24B4A', fontWeight: '600' }}>
-              Immediate referral to NRC required for specialised care
+              {tx('Immediate referral to NRC required for specialised care')}
             </p>
           </div>
         )}
@@ -275,8 +277,8 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
           }}>
             <span className="material-symbols-outlined text-[#1D9E75] text-[24px]">check_circle</span>
             <div>
-              <p style={{ fontWeight: '700', color: '#085041', fontSize: '15px' }}>NRC Referral Sent</p>
-              <p style={{ fontSize: '12px', color: '#555' }}>Awaiting admin review</p>
+              <p style={{ fontWeight: '700', color: '#085041', fontSize: '15px' }}>{tx('NRC Referral Sent')}</p>
+              <p style={{ fontSize: '12px', color: '#555' }}>{tx('Awaiting admin review')}</p>
             </div>
           </div>
         ) : canRefer ? (
@@ -299,9 +301,9 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
             }}
           >
             {sending ? (
-              <><span className="material-symbols-outlined animate-spin mr-1">autorenew</span> Sending Referral…</>
+              <><span className="material-symbols-outlined animate-spin mr-1">autorenew</span> {tx('Sending Referral…', 'sending_referral')}</>
             ) : (
-              <><span className="material-symbols-outlined mr-1">local_hospital</span> Generate NRC Referral →</>
+              <><span className="material-symbols-outlined mr-1">local_hospital</span> {tx('Generate NRC Referral →', 'generate_nrc_referral')}</>
             )}
           </button>
         ) : (
@@ -313,7 +315,7 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
               borderRadius: '14px', fontSize: '14px', cursor: 'default',
             }}
           >
-            No immediate referral needed
+            {tx('No immediate referral needed')}
           </button>
         )}
 
@@ -337,9 +339,9 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
           }}
         >
           {journeyLoading ? (
-            <><span className="material-symbols-outlined" style={{ fontSize: '20px', animation: 'spin 1s linear infinite' }}>refresh</span> Getting your location…</>
+            <><span className="material-symbols-outlined" style={{ fontSize: '20px', animation: 'spin 1s linear infinite' }}>refresh</span> {tx('Getting your location…')}</>
           ) : (
-            <><span className="material-symbols-outlined" style={{ fontSize: '20px' }}>directions</span> Start Journey</>  
+            <><span className="material-symbols-outlined" style={{ fontSize: '20px' }}>directions</span> {tx('Start Journey')}</>  
           )}
         </button>
         {journeyError && (
@@ -359,7 +361,7 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
             color: '#555', fontSize: '14px', cursor: 'pointer',
           }}
         >
-          Close
+          {tx('Close')}
         </button>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -377,11 +379,15 @@ const PriorityList = () => {
 
   const auth = getAuth();
   const { ashaId: storeAshaId, user } = useAuthStore();
+  const tx = useTx();
   const hasAutoTriggered = useRef(false);
 
   const getAshaId = () => storeAshaId || localStorage.getItem('ashaId') || auth.currentUser?.uid;
   const getHeadId = () => localStorage.getItem('headId') || '';
   const ashaName  = user?.displayName || '';
+
+  // Risk level label helper — uses i18n keys for instant offline translation
+  const riskLabel = (level) => tx(level, level?.toLowerCase?.() || 'low');
 
   // Load existing referrals from Firestore so cards show "Referral Sent" badge
   const loadExistingReferrals = async (ashaId, children) => {
@@ -508,13 +514,13 @@ const PriorityList = () => {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1A1A18' }}>Today's Priority Visits</h2>
+          <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#1A1A18' }}>{tx('Today\'s Priority Visits', 'todays_priority')}</h2>
           {source && (
             <p style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>
               {source === 'firestore' ? (
-                <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">inventory_2</span> From Firestore (direct)</span>
+                <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">inventory_2</span> {tx('From Firestore (direct)')}</span>
               ) : (
-                <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">smart_toy</span> From Risk Engine</span>
+                <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">smart_toy</span> {tx('From Risk Engine', 'from_risk_engine')}</span>
               )}
             </p>
           )}
@@ -530,7 +536,7 @@ const PriorityList = () => {
             fontWeight: '600', opacity: (calculating || loading) ? 0.6 : 1,
           }}
         >
-          <span className={`material-symbols-outlined text-[16px] ${calculating ? 'animate-spin' : ''}`}>sync</span> {calculating ? 'Calculating…' : 'Refresh'}
+          <span className={`material-symbols-outlined text-[16px] ${calculating ? 'animate-spin' : ''}`}>sync</span> {calculating ? tx('Calculating…', 'calculating') : tx('Refresh', 'refresh')}
         </button>
       </div>
 
@@ -538,8 +544,8 @@ const PriorityList = () => {
       {items.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 20px', color: '#666' }}>
           <p style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}><span className="material-symbols-outlined text-[48px] text-gray-400">local_hospital</span></p>
-          <p style={{ fontWeight: '600' }}>No priority visits today</p>
-          <p style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>All children in your area are healthy!</p>
+          <p style={{ fontWeight: '600' }}>{tx('No priority visits today', 'no_priority_items')}</p>
+          <p style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>{tx('All children in your area are healthy!')}</p>
           <button
             onClick={triggerCalculation}
             disabled={calculating}
@@ -551,8 +557,8 @@ const PriorityList = () => {
             }}
           >
             {calculating ? (
-               <><span className="material-symbols-outlined text-[16px] animate-spin mr-1 align-middle">autorenew</span> Calculating…</>
-            ) : 'Calculate Risk Scores Now'}
+               <><span className="material-symbols-outlined text-[16px] animate-spin mr-1 align-middle">autorenew</span> {tx('Calculating…', 'calculating')}</>
+            ) : tx('Calculate Risk Scores Now', 'calculating_risk')}
           </button>
         </div>
       ) : (
@@ -588,17 +594,17 @@ const PriorityList = () => {
                         background: '#EAF3DE', color: '#085041',
                         padding: '1px 6px', borderRadius: '8px',
                         display: 'inline-flex', alignItems: 'center', gap: '2px'
-                      }}><span className="material-symbols-outlined text-[12px]">check</span> Referred</span>
+                      }}><span className="material-symbols-outlined text-[12px]">check</span> {tx('Referred', 'referred')}</span>
                     )}
                   </div>
                   <p style={{ fontSize: '12px', color: '#555' }}>
-                    {item.type === 'child' ? `${item.age_months} months` : 'Pregnancy'} · Score: {item.risk_score}/100
+                    {item.type === 'child' ? `${item.age_months} ${tx('months')}` : tx('Pregnancy case', 'pregnancy_case')} · {tx('Score', 'score')}: {item.risk_score}/100
                   </p>
                   <p style={{ fontSize: '12px', color: cfg.color, marginTop: '4px', fontWeight: '600' }}>
-                    {item.primary_driver}
+                    {tx(item.primary_driver)}
                   </p>
                   <p style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
-                    → {item.recommended_action}
+                    → {tx(item.recommended_action)}
                   </p>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
@@ -606,8 +612,8 @@ const PriorityList = () => {
                     background: cfg.color, color: 'white',
                     fontSize: '10px', padding: '3px 9px',
                     borderRadius: '10px', fontWeight: '700',
-                  }}>{cfg.label}</span>
-                  <span style={{ fontSize: '10px', color: '#999' }}>Tap for details →</span>
+                  }}>{riskLabel(item.risk_level)}</span>
+                  <span style={{ fontSize: '10px', color: '#999' }}>{tx('Tap for details →', 'tap_details')}</span>
                 </div>
               </div>
             </div>

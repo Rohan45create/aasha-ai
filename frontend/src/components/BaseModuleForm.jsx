@@ -6,10 +6,12 @@ import { useNavigate } from 'react-router-dom';
 import VoiceOverlay from './VoiceOverlay';
 import AmbientToggle from './AmbientToggle';
 import AadhaarAutofill from './AadhaarAutofill';
+import { useTx } from '../context/TranslationContext';
 
 export default function BaseModuleForm({ title, moduleIcon, collectionName, fields, moduleName, onSubmit, onFormChange, showAadhaar = true, aadhaarPersonLabel = '' }) {
   const { user, ashaId: storeAshaId } = useAuthStore();
   const navigate = useNavigate();
+  const tx = useTx();
   const [formData, setFormData] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
@@ -40,7 +42,7 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
         return merged;
       });
       setVoiceFilledFields(prev => [...new Set([...prev, ...newFilledFields])]);
-      showToast('Voice data applied to form', 'success');
+      showToast(tx('Voice data applied to form'), 'success');
     }
   };
 
@@ -61,7 +63,7 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
     });
     setAadhaarFilledFields(prev => [...new Set([...prev, ...filledKeys])]);
     const count = Object.keys(payload).length;
-    showToast(`Aadhaar scanned — ${count} field${count !== 1 ? 's' : ''} autofilled`, 'success');
+    showToast(`${tx('Aadhaar scanned')} — ${count} ${tx('field(s) autofilled')}`, 'success');
   };
 
   const validate = () => {
@@ -79,10 +81,9 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
     e.preventDefault();
     if (!user) return;
     if (!validate()) {
-      showToast('Please fill all required fields', 'error');
+      showToast(tx('Please fill all required fields'), 'error');
       return;
     }
-    // Use the resolved Firestore doc ID (e.g. 'asha_lata_001'), not Firebase Auth UID
     const resolvedAshaId = storeAshaId || localStorage.getItem('ashaId') || user?.uid;
     setIsLoading(true);
     try {
@@ -106,11 +107,11 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
           timestamp: serverTimestamp(),
         });
       }
-      showToast('Record saved successfully!', 'success');
+      showToast(tx('Record saved successfully!', 'record_saved'), 'success');
       setTimeout(() => navigate(-1), 800);
     } catch (err) {
       console.error(err);
-      showToast('Error saving data. Will sync when online.', 'error');
+      showToast(tx('Error saving data. Will sync when online.'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -177,10 +178,10 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
         {fields.map(field => (
           <div key={field.id}>
             <label className="block text-sm font-medium mb-1 text-[#5F5E5A]">
-              {field.label}
+              {tx(field.label)}
               {field.required && <span className="text-[#E24B4A] ml-1">*</span>}
-              {voiceFilledFields.includes(field.id) && <span className="ml-2 text-xs text-[#1D9E75] font-bold px-2 py-0.5 bg-[#EAF3DE] rounded border border-[#1D9E75] inline-flex items-center"><span className="material-symbols-outlined text-[14px] mr-1">mic</span> Voice filled</span>}
-              {aadhaarFilledFields.includes(field.id) && !voiceFilledFields.includes(field.id) && <span className="ml-2 text-xs text-blue-600 font-bold px-2 py-0.5 bg-blue-50 rounded border border-blue-300 inline-flex items-center"><span className="material-symbols-outlined text-[14px] mr-1">badge</span> Aadhaar filled</span>}
+              {voiceFilledFields.includes(field.id) && <span className="ml-2 text-xs text-[#1D9E75] font-bold px-2 py-0.5 bg-[#EAF3DE] rounded border border-[#1D9E75] inline-flex items-center"><span className="material-symbols-outlined text-[14px] mr-1">mic</span>{tx('Voice filled')}</span>}
+              {aadhaarFilledFields.includes(field.id) && !voiceFilledFields.includes(field.id) && <span className="ml-2 text-xs text-blue-600 font-bold px-2 py-0.5 bg-blue-50 rounded border border-blue-300 inline-flex items-center"><span className="material-symbols-outlined text-[14px] mr-1">badge</span>{tx('Aadhaar filled')}</span>}
             </label>
             {field.type === 'select' ? (
               <select
@@ -191,7 +192,7 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
                   errors[field.id] ? 'border-[#E24B4A]' : 'border-[#D3D1C7]'
                 }`}
               >
-                <option value="">Select...</option>
+                <option value="">{tx('Select...')}</option>
                 {field.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             ) : field.type === 'checkbox' ? (
@@ -202,7 +203,7 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
                   onChange={(e) => handleChange(e, field.id)}
                   className="w-5 h-5 accent-[#1D9E75]"
                 />
-                <span className="text-sm">{field.checkboxLabel || field.label}</span>
+                <span className="text-sm">{tx(field.checkboxLabel || field.label)}</span>
               </div>
             ) : field.type === 'textarea' ? (
               <textarea
@@ -239,10 +240,10 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
           {/* Submit + Cancel */}
           <div className="flex space-x-3">
             <button type="button" onClick={() => navigate(-1)} className="flex-1 py-3 border border-[#D3D1C7] text-[#5F5E5A] rounded-xl font-medium text-center hover:bg-gray-50 flex justify-center items-center">
-              Cancel
+              {tx('Cancel', 'cancel')}
             </button>
             <button type="submit" disabled={isLoading} className="flex-1 py-3 bg-[#1D9E75] text-white rounded-xl font-medium text-center shadow-md active:scale-[0.98] flex justify-center items-center">
-              {isLoading ? <span className="material-symbols-outlined animate-spin">refresh</span> : 'Save Record'}
+              {isLoading ? <span className="material-symbols-outlined animate-spin">refresh</span> : tx('Save Record', 'save_record')}
             </button>
           </div>
         </div>

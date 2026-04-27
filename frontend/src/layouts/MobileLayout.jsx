@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react';
 import LanguageToggle from '../components/LanguageToggle';
 import SyncStatusBar from '../components/SyncStatusBar';
 import { useTranslation } from 'react-i18next';
+import { useTx } from '../context/TranslationContext';
 
 export default function MobileLayout() {
   const { pathname } = useLocation();
   const { t } = useTranslation();
+  const tx = useTx();
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   useEffect(() => {
@@ -31,7 +33,7 @@ export default function MobileLayout() {
     // Desktop wrapper — grey background, centres the phone UI
     <div className="min-h-screen bg-gray-200 sm:flex sm:items-start sm:justify-center sm:pt-4">
       {/* Phone container — full screen on mobile, bounded on desktop */}
-      <div className="w-full sm:max-w-[430px] sm:min-h-[calc(100vh-2rem)] sm:shadow-2xl sm:rounded-2xl overflow-hidden bg-[#F1EFE8] flex flex-col relative font-sans antialiased text-[#1A1A18]">
+      <div className="w-full h-[100dvh] sm:h-[calc(100dvh-2rem)] sm:max-w-[430px] sm:shadow-2xl sm:rounded-2xl overflow-hidden bg-[#F1EFE8] flex flex-col relative font-sans antialiased text-[#1A1A18]">
         
         {/* Top bar */}
         <header className="flex justify-between items-center p-4 bg-[#085041] text-white shadow-md z-10 sticky top-0">
@@ -49,7 +51,7 @@ export default function MobileLayout() {
         {isOffline && (
           <div className="bg-[#E24B4A] text-white text-xs font-medium px-4 py-2 flex items-center gap-2">
             <span className="material-symbols-outlined text-sm">cloud_off</span>
-            Offline Mode — Changes will sync when connected
+            {tx('Offline Mode')} — {tx('Changes will sync when connected')}
           </div>
         )}
 

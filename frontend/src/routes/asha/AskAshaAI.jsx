@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
+import { useTx } from '../../context/TranslationContext';
 
 // Fallback for language store if it isn't created yet
 let useLanguageStore;
@@ -31,6 +32,7 @@ function TypingDots() {
 
 export default function AskAshaAI() {
   const { user } = useAuthStore();
+  const tx = useTx();
   const { currentLanguage } = useLanguageStore();
   const [messages, setMessages] = useState([
     {
@@ -167,7 +169,7 @@ export default function AskAshaAI() {
           <h2 style={{ fontWeight: '800', color: '#1A1A18', fontSize: '15px', lineHeight: 1.2 }}>Ask AshaAI</h2>
           <p style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
             <span style={{ width: '7px', height: '7px', background: '#1D9E75', borderRadius: '50%', display: 'inline-block' }} />
-            Powered by Gemini · Always online
+            {tx('Powered by Gemini')} · {tx('Always online')}
           </p>
         </div>
       </div>
@@ -276,7 +278,7 @@ export default function AskAshaAI() {
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={isRecording ? 'Listening…' : 'Ask about health protocols…'}
+            placeholder={isRecording ? tx('Listening…') : tx('Ask about health protocols…')}
             disabled={isRecording || isProcessing}
             style={{
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
@@ -299,7 +301,7 @@ export default function AskAshaAI() {
           </button>
         </div>
         <p style={{ textAlign: 'center', fontSize: '10px', color: '#AAA', marginTop: '8px' }}>
-          AshaAI provides guidance based on official protocols. Always refer emergencies to PHC.
+          {tx('AshaAI provides guidance based on official protocols. Always refer emergencies to PHC.')}
         </p>
         <style>{`
           @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

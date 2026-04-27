@@ -11,7 +11,7 @@ from config.gemini_config import configure_gemini
 
 # Import routers
 from routers.modules import family_survey
-from routers import risk, voice, admin, vision, ambient, security, register, members, chat
+from routers import risk, voice, admin, vision, ambient, security, register, members, chat, translate
 
 # Initialize External Services
 initialize_firebase()
@@ -52,6 +52,8 @@ app.include_router(admin.router, dependencies=[Depends(verify_firebase_token)])
 app.include_router(register.router, dependencies=[Depends(verify_firebase_token)])
 app.include_router(members.router, dependencies=[Depends(verify_firebase_token)])
 app.include_router(chat.router, dependencies=[Depends(verify_firebase_token)])
+app.include_router(translate.router, dependencies=[Depends(verify_firebase_token)])
+
 
 # Ambient AI WebSocket — authenticates internally via query param
 app.include_router(ambient.router)
