@@ -22,6 +22,8 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
   const [sent, setSent]           = useState(item._referralSent || false);
   const [referralId, setReferralId] = useState(item._referralId || null);
   const [error, setError]         = useState('');
+  const [journeyLoading, setJourneyLoading] = useState(false);
+  const [journeyError, setJourneyError]     = useState('');
 
   const canRefer = ['CRITICAL', 'HIGH'].includes(item.risk_level) && !sent;
 
@@ -78,6 +80,61 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
     } finally {
       setSending(false);
     }
+  };
+
+  // ── Start Journey — get current GPS, fetch household location, open Google Maps ──
+  const startJourney = () => {
+    setJourneyLoading(true);
+    setJourneyError('');
+
+    const getDestination = async () => {
+      let village = '';
+      let lat = null;
+      let lng = null;
+      try {
+        const childSnap = await getDoc(doc(db, 'children', item.id));
+        if (childSnap.exists()) {
+          const cd = childSnap.data();
+          village = cd.village || cd.villageName || cd.address || '';
+          lat = cd.lat || cd.latitude || null;
+          lng = cd.lng || cd.longitude || null;
+        }
+      } catch (_) {}
+      return { village, lat, lng };
+    };
+
+    if (!navigator.geolocation) {
+      setJourneyError('GPS not supported on this device.');
+      setJourneyLoading(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude: myLat, longitude: myLng } = position.coords;
+        const { village, lat: destLat, lng: destLng } = await getDestination();
+
+        let destination = '';
+        if (destLat && destLng) {
+          destination = `${destLat},${destLng}`;
+        } else if (village) {
+          destination = encodeURIComponent(`${village}, Maharashtra, India`);
+        } else {
+          // Fall back to child's name as search query
+          destination = encodeURIComponent(`${item.name}'s home, Maharashtra`);
+        }
+
+        const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${myLat},${myLng}&destination=${destination}&travelmode=driving`;
+        window.open(mapsUrl, '_blank');
+        setJourneyLoading(false);
+      },
+      (err) => {
+        console.error('[Journey] GPS error:', err);
+        setJourneyError('Could not get your location. Please allow location access.');
+        setJourneyLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   const scoreColor =
@@ -260,11 +317,43 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
           </button>
         )}
 
+        {/* ── Start Journey button ── */}
+        <button
+          onClick={startJourney}
+          disabled={journeyLoading}
+          style={{
+            width: '100%', marginTop: '12px',
+            padding: '14px',
+            background: journeyLoading ? '#D3D1C7' : 'linear-gradient(135deg, #185FA5, #1D9E75)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '14px',
+            fontSize: '15px',
+            fontWeight: '700',
+            cursor: journeyLoading ? 'not-allowed' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            boxShadow: journeyLoading ? 'none' : '0 4px 16px rgba(24,95,165,0.3)',
+            transition: 'all 0.2s',
+          }}
+        >
+          {journeyLoading ? (
+            <><span className="material-symbols-outlined" style={{ fontSize: '20px', animation: 'spin 1s linear infinite' }}>refresh</span> Getting your location…</>
+          ) : (
+            <><span className="material-symbols-outlined" style={{ fontSize: '20px' }}>directions</span> Start Journey</>  
+          )}
+        </button>
+        {journeyError && (
+          <p style={{ fontSize: '12px', color: '#E24B4A', textAlign: 'center', marginTop: '6px' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '13px', verticalAlign: 'middle', marginRight: '3px' }}>location_off</span>
+            {journeyError}
+          </p>
+        )}
+
         {/* Close button */}
         <button
           onClick={onClose}
           style={{
-            width: '100%', marginTop: '12px',
+            width: '100%', marginTop: '10px',
             padding: '14px', background: 'none',
             border: '1px solid #D3D1C7', borderRadius: '14px',
             color: '#555', fontSize: '14px', cursor: 'pointer',
@@ -272,6 +361,7 @@ const DetailSheet = ({ item, ashaId, ashaName, headId, onClose }) => {
         >
           Close
         </button>
+        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
     </div>
   );

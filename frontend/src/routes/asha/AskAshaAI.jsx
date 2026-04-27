@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 
-
 // Fallback for language store if it isn't created yet
 let useLanguageStore;
 try {
@@ -11,157 +10,301 @@ try {
   useLanguageStore = () => ({ currentLanguage: 'en' });
 }
 
+const QUICK_QUESTIONS = [
+  { label: 'SAM Signs?', q: 'What are the signs of Severe Acute Malnutrition in a child?' },
+  { label: 'ANC Schedule', q: 'What is the ANC schedule for a pregnant woman?' },
+  { label: 'Vaccination', q: 'What vaccines does a 6-week-old baby need?' },
+  { label: 'Danger Signs', q: 'What are the danger signs in a newborn baby?' },
+];
+
+function TypingDots() {
+  return (
+    <div className="flex items-start">
+      <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm flex items-center gap-1.5">
+        <div className="w-2 h-2 bg-[#1D9E75] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+        <div className="w-2 h-2 bg-[#1D9E75] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+        <div className="w-2 h-2 bg-[#1D9E75] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+      </div>
+    </div>
+  );
+}
+
 export default function AskAshaAI() {
   const { user } = useAuthStore();
   const { currentLanguage } = useLanguageStore();
   const [messages, setMessages] = useState([
-    { role: 'ai', content: 'How can I assist you with health protocols today?', timestamp: Date.now() }
+    {
+      role: 'ai',
+      content: 'Namaste! I am AshaAI — your health assistant. Ask me about malnutrition, ANC, vaccination, danger signs, or any health protocol.',
+      timestamp: Date.now(),
+    },
   ]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [errorState, setErrorState] = useState(null);
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
   useEffect(scrollToBottom, [messages, isTyping]);
 
+  // ── Core send function ───────────────────────────────────────────────────────
   const sendToChatAPI = async (text) => {
     setIsTyping(true);
     setErrorState(null);
+
+    // Build conversation history (exclude error messages)
+    const history = messages
+      .filter(m => !m.isError)
+      .map(m => ({ role: m.role, content: m.content }));
+
     try {
       const token = await user?.getIdToken();
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/chat?language=${currentLanguage}`, {
-         method: 'POST',
-         headers: { 
-           'Content-Type': 'application/json',
-           'Authorization': `Bearer ${token}` 
-         },
-         body: JSON.stringify({ 
+
+      const res = await fetch(
+        `${import.meta.env.VITE_BACKEND_URL}/api/chat`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
             message: text,
-            conversation_history: messages 
-         })
-      });
-      if (!res.ok) throw new Error("API failed");
-      
+            language: currentLanguage || 'en',
+            conversation_history: history,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || `Server error ${res.status}`);
+      }
+
       const data = await res.json();
-      setMessages(prev => [...prev, { role: 'ai', content: data.response, timestamp: Date.now() }]);
+      setMessages(prev => [
+        ...prev,
+        { role: 'ai', content: data.response, timestamp: Date.now() },
+      ]);
     } catch (err) {
-      console.error(err);
+      console.error('[AskAshaAI] chat error:', err);
       setErrorState(text);
-      setMessages(prev => [...prev, { role: 'ai', content: 'Could not reach AshaAI. Check your connection.', isError: true, timestamp: Date.now() }]);
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'ai',
+          content: `Could not reach AshaAI. ${err.message || 'Check your connection.'}`,
+          isError: true,
+          timestamp: Date.now(),
+        },
+      ]);
     } finally {
       setIsTyping(false);
     }
   };
 
+  // ── Handlers ─────────────────────────────────────────────────────────────────
   const handleSendText = () => {
-    if (!inputText.trim()) return;
-    const text = inputText;
+    const text = inputText.trim();
+    if (!text || isTyping) return;
     setMessages(prev => [...prev, { role: 'user', content: text, timestamp: Date.now() }]);
     setInputText('');
     sendToChatAPI(text);
+    inputRef.current?.focus();
+  };
+
+  const handleQuickQuestion = (q) => {
+    if (isTyping) return;
+    setMessages(prev => [...prev, { role: 'user', content: q, timestamp: Date.now() }]);
+    sendToChatAPI(q);
   };
 
   const handleRetry = () => {
     if (errorState) {
-       // remove the last error message
-       setMessages(prev => prev.filter(m => !m.isError));
-       sendToChatAPI(errorState);
+      setMessages(prev => prev.filter(m => !m.isError));
+      sendToChatAPI(errorState);
     }
   };
 
-  const onVoiceTranscription = (fields, transcript) => {
-    if (transcript) {
-       setMessages(prev => [...prev, { role: 'user', content: transcript, isVoice: true, timestamp: Date.now() }]);
-       sendToChatAPI(transcript);
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendText();
     }
   };
 
-  const { isRecording, isProcessing, startRecording, stopRecording } = useVoiceRecorder('chat', onVoiceTranscription);
-
-  const formatTime = (ts) => {
-    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  // ── Voice ─────────────────────────────────────────────────────────────────────
+  const onVoiceTranscription = (_fields, transcript) => {
+    if (transcript?.trim()) {
+      setMessages(prev => [
+        ...prev,
+        { role: 'user', content: transcript, isVoice: true, timestamp: Date.now() },
+      ]);
+      sendToChatAPI(transcript);
+    }
   };
 
+  const { isRecording, isProcessing, startRecording, stopRecording } =
+    useVoiceRecorder('chat', onVoiceTranscription);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+  const formatTime = (ts) =>
+    new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] bg-gray-50 rounded-2xl overflow-hidden shadow-sm border border-gray-200">
-      
-      <div className="bg-white border-b border-gray-200 p-4 shadow-sm flex items-center justify-between z-10">
-         <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#EAF3DE] rounded-full flex items-center justify-center text-[#1D9E75]">
-               <span className="material-symbols-outlined">forum</span>
-            </div>
-            <div>
-               <h2 className="font-bold text-gray-900 leading-tight">Ask AshaAI</h2>
-               <p className="text-xs text-[#1D9E75] font-medium flex items-center gap-1">
-                 <span className="w-2 h-2 rounded-full bg-[#1D9E75]"></span> Online
-               </p>
-            </div>
-         </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 140px)', background: '#F5F4EF', borderRadius: '20px', overflow: 'hidden', border: '1px solid #D3D1C7' }}>
+
+      {/* ── Header ── */}
+      <div style={{ background: '#fff', borderBottom: '1px solid #E8E7E0', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        <div style={{ width: '42px', height: '42px', background: 'linear-gradient(135deg, #EAF3DE, #C3E8D3)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span className="material-symbols-outlined" style={{ color: '#085041', fontSize: '22px' }}>smart_toy</span>
+        </div>
+        <div style={{ flex: 1 }}>
+          <h2 style={{ fontWeight: '800', color: '#1A1A18', fontSize: '15px', lineHeight: 1.2 }}>Ask AshaAI</h2>
+          <p style={{ fontSize: '11px', color: '#1D9E75', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '2px' }}>
+            <span style={{ width: '7px', height: '7px', background: '#1D9E75', borderRadius: '50%', display: 'inline-block' }} />
+            Powered by Gemini · Always online
+          </p>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-4 p-4 pb-8">
+      {/* ── Quick Questions (show only at start) ── */}
+      {messages.length === 1 && (
+        <div style={{ padding: '14px 16px 4px', display: 'flex', gap: '8px', flexWrap: 'wrap', flexShrink: 0 }}>
+          {QUICK_QUESTIONS.map((item) => (
+            <button
+              key={item.label}
+              onClick={() => handleQuickQuestion(item.q)}
+              disabled={isTyping}
+              style={{
+                background: '#fff', border: '1.5px solid #1D9E75', color: '#085041',
+                borderRadius: '20px', padding: '6px 14px', fontSize: '12px', fontWeight: '600',
+                cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Messages ── */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
         {messages.map((m, i) => (
-           <div key={i} className={`flex flex-col ${m.role === 'ai' ? 'items-start' : 'items-end'}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed shadow-sm ${m.role === 'ai' ? (m.isError ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-white border border-gray-200 text-gray-800 rounded-tl-sm') : 'bg-[#1D9E75] text-white rounded-tr-sm'}`}>
-                 {m.isVoice && <span className="material-symbols-outlined text-[16px] align-middle mr-1">mic</span>}
-                 {m.content}
-                 {m.isError && (
-                    <button onClick={handleRetry} className="mt-2 text-sm font-bold block hover:underline text-red-600">
-                      ↻ Retry
-                    </button>
-                 )}
-              </div>
-              <span className="text-[10px] text-gray-400 mt-1 px-1">{formatTime(m.timestamp)}</span>
-           </div>
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: m.role === 'ai' ? 'flex-start' : 'flex-end' }}>
+            <div
+              style={{
+                maxWidth: '85%', borderRadius: '18px', padding: '12px 16px', fontSize: '14px', lineHeight: '1.6',
+                ...(m.role === 'ai'
+                  ? m.isError
+                    ? { background: '#FCEBEB', border: '1px solid #E24B4A', color: '#791F1F', borderTopLeftRadius: '4px' }
+                    : { background: '#fff', border: '1px solid #E8E7E0', color: '#1A1A18', borderTopLeftRadius: '4px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
+                  : { background: '#085041', color: '#fff', borderTopRightRadius: '4px', boxShadow: '0 2px 8px rgba(8,80,65,0.3)' }
+                ),
+              }}
+            >
+              {/* AI icon + voice tag */}
+              {m.role === 'ai' && !m.isError && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '14px', color: '#1D9E75' }}>smart_toy</span>
+                  <span style={{ fontSize: '10px', fontWeight: '700', color: '#1D9E75', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AshaAI</span>
+                </div>
+              )}
+              {m.isVoice && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10px', fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>mic</span> Voice
+                </span>
+              )}
+              {/* Message content — preserve line breaks */}
+              <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+              {m.isError && (
+                <button
+                  onClick={handleRetry}
+                  style={{ marginTop: '8px', fontSize: '12px', fontWeight: '700', color: '#E24B4A', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>refresh</span> Retry
+                </button>
+              )}
+            </div>
+            <span style={{ fontSize: '10px', color: '#AAA', marginTop: '4px', paddingInline: '4px' }}>
+              {formatTime(m.timestamp)}
+            </span>
+          </div>
         ))}
-        {isTyping && (
-           <div className="flex items-start">
-             <div className="bg-white border border-gray-200 rounded-2xl p-4 rounded-tl-sm shadow-sm flex gap-1">
-               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-             </div>
-           </div>
-        )}
+
+        {isTyping && <TypingDots />}
         <div ref={messagesEndRef} />
       </div>
-      
-      <div className="bg-white border-t border-gray-200 p-3 pt-4 px-4 shadow-[0_-4px_10px_rgba(0,0,0,0.03)] z-10">
-        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 p-2 rounded-2xl focus-within:bg-white focus-within:border-[#1D9E75] focus-within:ring-2 focus-within:ring-[#EAF3DE] transition-all">
-          <button 
-             onClick={isRecording ? stopRecording : startRecording}
-             disabled={isProcessing}
-             className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all shadow-sm ${
-               isRecording ? 'bg-red-500 text-white animate-pulse' : 
-               isProcessing ? 'bg-gray-200 text-gray-500' : 'bg-white text-[#1D9E75] hover:bg-[#EAF3DE]'
-             }`}
+
+      {/* ── Input bar ── */}
+      <div style={{ background: '#fff', borderTop: '1px solid #E8E7E0', padding: '12px 14px', flexShrink: 0 }}>
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', gap: '8px', background: '#F5F4EF',
+            border: '1.5px solid #D3D1C7', borderRadius: '20px', padding: '6px 8px',
+            transition: 'border-color 0.2s',
+          }}
+          onFocus={() => {}}
+        >
+          {/* Voice button */}
+          <button
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={isProcessing || isTyping}
+            style={{
+              width: '36px', height: '36px', borderRadius: '50%', border: 'none', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              transition: 'all 0.2s',
+              background: isRecording ? '#E24B4A' : isProcessing ? '#D3D1C7' : '#EAF3DE',
+              color: isRecording ? '#fff' : '#085041',
+              animation: isRecording ? 'pulse 1s infinite' : 'none',
+            }}
           >
-             {isProcessing ? <span className="material-symbols-outlined animate-spin text-sm">refresh</span> : 
-              <span className="material-symbols-outlined text-[20px]">{isRecording ? 'stop_circle' : 'mic'}</span>}
+            {isProcessing
+              ? <span className="material-symbols-outlined" style={{ fontSize: '18px', animation: 'spin 1s linear infinite' }}>refresh</span>
+              : <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>{isRecording ? 'stop_circle' : 'mic'}</span>
+            }
           </button>
-          
-          <input 
-             type="text" 
-             value={inputText}
-             onChange={(e) => setInputText(e.target.value)}
-             onKeyPress={(e) => e.key === 'Enter' && handleSendText()}
-             placeholder={isRecording ? "Listening..." : "Ask a health question..."}
-             disabled={isRecording || isProcessing}
-             className="flex-1 outline-none text-[15px] bg-transparent px-2 disabled:opacity-50"
+
+          {/* Text input */}
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={isRecording ? 'Listening…' : 'Ask about health protocols…'}
+            disabled={isRecording || isProcessing}
+            style={{
+              flex: 1, background: 'transparent', border: 'none', outline: 'none',
+              fontSize: '14px', color: '#1A1A18',
+            }}
           />
-          
-          <button 
-             onClick={handleSendText} 
-             disabled={!inputText.trim() || isRecording || isProcessing} 
-             className="w-10 h-10 bg-[#1D9E75] text-white rounded-full flex items-center justify-center flex-shrink-0 disabled:opacity-50 disabled:bg-gray-300 transition-colors shadow-sm"
+
+          {/* Send button */}
+          <button
+            onClick={handleSendText}
+            disabled={!inputText.trim() || isTyping || isRecording || isProcessing}
+            style={{
+              width: '36px', height: '36px', borderRadius: '50%', border: 'none', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              background: inputText.trim() && !isTyping ? '#085041' : '#D3D1C7',
+              color: '#fff', transition: 'background 0.2s',
+            }}
           >
-             <span className="material-symbols-outlined text-[18px]">send</span>
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>send</span>
           </button>
         </div>
-        <p className="text-center text-[10px] text-gray-400 mt-2">AshaAI provides guidance based on official protocols. Always refer emergencies to PHC.</p>
+        <p style={{ textAlign: 'center', fontSize: '10px', color: '#AAA', marginTop: '8px' }}>
+          AshaAI provides guidance based on official protocols. Always refer emergencies to PHC.
+        </p>
+        <style>{`
+          @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+          @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        `}</style>
       </div>
     </div>
   );
