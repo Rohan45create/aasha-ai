@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { db } from '../../firebase';
 import { collection, query, where, getDocs, getDoc, doc, Timestamp } from 'firebase/firestore';
+import AdminReportModal from '../../components/AdminReportModal';
 
 const FALLBACK_ASHA_IDS = [
   'asha_lata_001', 'asha_priya_002', 'asha_kavita_003',
@@ -21,6 +22,8 @@ function calcChange(current, previous) {
 export default function Reports() {
   const [metrics, setMetrics] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMetric, setSelectedMetric] = useState(null);
+  const [adminAshaIds, setAdminAshaIds] = useState(FALLBACK_ASHA_IDS);
   const { headId: storeHeadId } = useAuthStore();
   const headId = storeHeadId || localStorage.getItem('headId') || 'head_sunita_001';
 
@@ -37,6 +40,8 @@ export default function Reports() {
         const ashaIds = headDoc.exists()
           ? (headDoc.data()?.ashaIds?.length > 0 ? headDoc.data().ashaIds : FALLBACK_ASHA_IDS)
           : FALLBACK_ASHA_IDS;
+          
+        setAdminAshaIds(ashaIds);
 
         const tsThis = Timestamp.fromDate(thisMonthStart);
         const tsLast = Timestamp.fromDate(lastMonthStart);
@@ -128,7 +133,7 @@ export default function Reports() {
   };
 
   return (
-    <div className="p-4 md:p-8">
+    <div className="p-4 md:p-8 relative">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">Reports</h1>
@@ -154,8 +159,12 @@ export default function Reports() {
             </thead>
             <tbody>
               {metrics.map(m => (
-                <tr key={m.name} className="border-t border-[#D3D1C7] hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-sm">{m.name}</td>
+                <tr 
+                  key={m.name} 
+                  className="border-t border-[#D3D1C7] hover:bg-[#EAF3DE] cursor-pointer transition-colors"
+                  onClick={() => setSelectedMetric(m.name)}
+                >
+                  <td className="px-4 py-3 font-medium text-sm text-[#085041] underline decoration-1 underline-offset-2">{m.name}</td>
                   <td className="px-4 py-3 text-center font-bold">{m.current}</td>
                   <td className="px-4 py-3 text-center text-[#5F5E5A] hidden sm:table-cell">{m.previous}</td>
                   <td className="px-4 py-3 text-center">
@@ -167,7 +176,17 @@ export default function Reports() {
               ))}
             </tbody>
           </table>
+          <p className="text-xs text-[#5F5E5A] mt-3">Click on any metric row to download a detailed PDF report across all workers.</p>
         </div>
+      )}
+
+      {selectedMetric && (
+        <AdminReportModal
+          isOpen={!!selectedMetric}
+          onClose={() => setSelectedMetric(null)}
+          metricName={selectedMetric}
+          ashaIds={adminAshaIds}
+        />
       )}
     </div>
   );
