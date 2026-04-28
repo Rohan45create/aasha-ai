@@ -36,6 +36,7 @@ const AdminDashboard = lazy(() => import('./routes/admin/Dashboard.jsx'));
 const SurveyBuilder = lazy(() => import('./routes/admin/SurveyBuilder.jsx'));
 const CoverageMap = lazy(() => import('./routes/admin/CoverageMap.jsx'));
 const WorkerManagement = lazy(() => import('./routes/admin/WorkerManagement.jsx'));
+const WorkerActivity = lazy(() => import('./routes/admin/WorkerActivity.jsx'));
 const PendingReview = lazy(() => import('./routes/admin/PendingReview.jsx'));
 const Reports = lazy(() => import('./routes/admin/Reports.jsx'));
 const AdminReferrals = lazy(() => import('./routes/admin/Referrals.jsx'));
@@ -230,6 +231,7 @@ const App = () => {
           <Route element={<AdminGuard><AdminLayout /></AdminGuard>}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/workers" element={<WorkerManagement />} />
+            <Route path="/admin/worker/:id" element={<WorkerActivity />} />
             <Route path="/admin/review" element={<PendingReview />} />
             <Route path="/admin/builder" element={<SurveyBuilder />} />
             <Route path="/admin/map" element={<CoverageMap />} />

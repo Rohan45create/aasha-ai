@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import {
   collection, query, where, onSnapshot,
-  doc, updateDoc, serverTimestamp
+  doc, updateDoc, serverTimestamp, getDoc
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useTx } from '../../context/TranslationContext';
@@ -40,7 +40,18 @@ const ReviewModal = ({ referral, onClose }) => {
   const [notes,   setNotes]   = useState(referral.notes   || '');
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState('');
+  const [childData, setChildData] = useState(null);
   const tx = useTx();
+
+  useEffect(() => {
+    if (referral.childId) {
+      getDoc(doc(db, 'children', referral.childId))
+        .then(snap => {
+          if (snap.exists()) setChildData(snap.data());
+        })
+        .catch(e => console.warn('[ReviewModal] failed to fetch child data', e));
+    }
+  }, [referral.childId]);
 
   const save = async () => {
     setSaving(true);
@@ -137,6 +148,34 @@ const ReviewModal = ({ referral, onClose }) => {
             )}
           </div>
         </div>
+
+        {/* Full Child Info */}
+        {childData && (
+          <div style={{ marginTop: '16px', marginBottom: '16px', borderTop: '1px solid #D3D1C7', paddingTop: '16px' }}>
+            <h4 style={{ fontSize: '13px', fontWeight: '700', color: '#555', marginBottom: '8px', textTransform: 'uppercase' }}>
+              {tx('Child Full Record')}
+            </h4>
+            <div style={{ maxHeight: '200px', overflowY: 'auto', background: '#F9F9F9', padding: '12px', borderRadius: '10px', fontSize: '12px' }} className="custom-scrollbar">
+              {Object.entries(childData).map(([key, val]) => {
+                if (key === 'createdAt' || key === 'updatedAt' || key === 'ashaId' || key === 'householdId') return null;
+                let displayVal = val;
+                if (typeof val === 'boolean') displayVal = val ? 'Yes' : 'No';
+                if (val && typeof val === 'object' && val.seconds) {
+                  displayVal = new Date(val.seconds * 1000).toLocaleDateString();
+                }
+                if (typeof displayVal === 'string' || typeof displayVal === 'number') {
+                  return (
+                    <div key={key} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #EAEAEA', padding: '4px 0' }}>
+                      <span style={{ color: '#777', textTransform: 'capitalize' }}>{key.replace(/([A-Z])/g, ' $1').trim()}</span>
+                      <span style={{ fontWeight: '600', maxWidth: '60%', textAlign: 'right', wordBreak: 'break-word', color: '#1A1A18' }}>{String(displayVal)}</span>
+                    </div>
+                  );
+                }
+                return null;
+              })}
+            </div>
+          </div>
+        )}
 
         {/* NRC Name — admin fills this */}
         <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#555', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
@@ -246,29 +285,46 @@ export default function Referrals() {
   const { headId, user } = useAuthStore();
 
   useEffect(() => {
-    const resolvedHeadId = headId || localStorage.getItem('headId');
-    if (!resolvedHeadId) { setLoading(false); return; }
+    let unsub = () => {};
+    const fetchReferrals = async () => {
+      const resolvedHeadId = headId || localStorage.getItem('headId');
+      if (!resolvedHeadId) { setLoading(false); return; }
 
-    // Real-time listener — query by headId first; also listen for all if headId field missing on old docs
-    const q = query(
-      collection(db, 'referrals'),
-      where('headId', '==', resolvedHeadId)
-    );
+      // 1. Get the list of ASHA workers assigned to this head
+      let ashaIds = ['asha_lata_001','asha_priya_002','asha_kavita_003','asha_meena_004','asha_anita_005'];
+      try {
+        const headDoc = await getDoc(doc(db, 'asha_heads', resolvedHeadId));
+        if (headDoc.exists() && headDoc.data()?.ashaIds) {
+          ashaIds = headDoc.data().ashaIds;
+        }
+      } catch (e) {
+        console.warn('[Referrals] Failed to get asha_heads, using fallback IDs.');
+      }
 
-    const unsub = onSnapshot(q, snap => {
-      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Sort newest first
-      docs.sort((a, b) => {
-        const ta = a.createdAt?.toMillis?.() || new Date(a.referredDate || 0).getTime();
-        const tb = b.createdAt?.toMillis?.() || new Date(b.referredDate || 0).getTime();
-        return tb - ta;
+      // 2. Query referrals for those ASHA workers
+      // Firestore 'in' query supports up to 10 items
+      const q = query(
+        collection(db, 'referrals'),
+        where('ashaId', 'in', ashaIds.slice(0, 10))
+      );
+
+      unsub = onSnapshot(q, snap => {
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Sort newest first
+        docs.sort((a, b) => {
+          const ta = a.createdAt?.toMillis?.() || new Date(a.referredDate || 0).getTime();
+          const tb = b.createdAt?.toMillis?.() || new Date(b.referredDate || 0).getTime();
+          return tb - ta;
+        });
+        setReferrals(docs);
+        setLoading(false);
+      }, err => {
+        console.error('[Referrals] Firestore error:', err);
+        setLoading(false);
       });
-      setReferrals(docs);
-      setLoading(false);
-    }, err => {
-      console.error('[Referrals] Firestore error:', err);
-      setLoading(false);
-    });
+    };
+
+    fetchReferrals();
 
     return () => unsub();
   }, [headId]);
