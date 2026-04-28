@@ -86,6 +86,11 @@ export default function ASHALogin() {
             {t('login')}
           </h2>
 
+            <div className="mt-6 bg-[#EAF3DE] border border-[#1D9E75] rounded-xl p-4">
+            <p className="text-xs font-bold text-[#27500A] mb-2"><span className="material-symbols-outlined text-[16px] align-middle mr-1">key</span> Demo Credentials</p>
+            <p className="text-xs text-[#27500A] font-mono">Phone Number: 9876543211</p>
+            <p className="text-xs text-[#27500A] font-mono mt-1">OTP: 123456</p>
+          </div>
           <form onSubmit={step === 1 ? handleSendOtp : handleVerifyOtp} className="space-y-5">
             {step === 1 ? (
               <div>

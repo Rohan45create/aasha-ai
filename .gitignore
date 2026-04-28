@@ -50,3 +50,5 @@ FEATURE_CHECKLIST.md
 seed_data.py
 import_dummy_data.py
 patch_head_email.js
+fix_data.py
+fix_survey.py

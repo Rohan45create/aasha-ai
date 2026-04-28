@@ -38,18 +38,40 @@ export default React.memo(function WorkerManagement() {
   const navigate = useNavigate();
   const headId = storeHeadId || localStorage.getItem('headId') || 'head_sunita_001';
 
-  // ── Load timeline events ──────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedActivityWorker || !showTimeline) return;
     setTimelineLoading(true);
-    const q = query(
-      collection(db, 'module_submissions'),
-      where('ashaId', '==', selectedActivityWorker.id),
-      orderBy('submittedAt', 'desc'),
-      limit(20)
-    );
-    getDocs(q).then(snap => {
-      setTimelineEvents(snap.docs.map(d => d.data()));
+    
+    const collectionsToFetch = [
+      'households', 'household_members', 'birth_records', 'children',
+      'vaccinations', 'pregnancies', 'anc', 'disease_cases',
+      'ncd_records', 'death_records', 'family_planning', 'elderly_care',
+      'village_health', 'referrals'
+    ];
+
+    let allEvents = [];
+
+    Promise.all(collectionsToFetch.map(async (collName) => {
+      try {
+        const q = query(collection(db, collName), where('ashaId', '==', selectedActivityWorker.id));
+        const snap = await getDocs(q);
+        snap.docs.forEach(d => {
+          const data = d.data();
+          let dateObj = new Date();
+          const rawDate = data.createdAt || data.submittedAt || data.surveyDate || data.visitDate || data.dateOfDeath;
+          if (rawDate) {
+            dateObj = rawDate.toDate ? rawDate.toDate() : new Date(rawDate);
+          }
+          allEvents.push({
+            moduleType: collName.replace(/_/g, ' '),
+            submittedAt: { toDate: () => dateObj },
+            notes: data.notes || `Recorded in ${collName.replace(/_/g, ' ')}`
+          });
+        });
+      } catch (e) { /* ignore */ }
+    })).then(() => {
+      allEvents.sort((a, b) => b.submittedAt.toDate().getTime() - a.submittedAt.toDate().getTime());
+      setTimelineEvents(allEvents.slice(0, 20)); // Keep only top 20 recent
       setTimelineLoading(false);
     }).catch(e => {
       console.error(e);
@@ -72,51 +94,70 @@ export default React.memo(function WorkerManagement() {
       monthStart.setDate(1);
       monthStart.setHours(0, 0, 0, 0);
 
-      const results = await Promise.all(
-        ashaIds.map(async (aid) => {
-          const workerDoc = await getDoc(doc(db, 'ashas', aid));
-          if (!workerDoc.exists()) return null;
+        const collectionsToFetch = [
+          'households',
+          'household_members',
+          'birth_records',
+          'children',
+          'vaccinations',
+          'pregnancies',
+          'anc',
+          'disease_cases',
+          'ncd_records',
+          'death_records',
+          'family_planning',
+          'elderly_care',
+          'village_health',
+          'referrals'
+        ];
 
-          const data = workerDoc.data();
+        const results = await Promise.all(
+          ashaIds.map(async (aid) => {
+            const workerDoc = await getDoc(doc(db, 'ashas', aid));
+            if (!workerDoc.exists()) return null;
 
-          // Submissions this month
-          let submissionsThisMonth = 0;
-          try {
-            const subsSnap = await getDocs(query(
-              collection(db, 'module_submissions'),
-              where('ashaId', '==', aid),
-              where('submittedAt', '>=', monthStart)
-            ));
-            submissionsThisMonth = subsSnap.size;
-          } catch (_) { /* composite index may not exist yet */ }
+            const data = workerDoc.data();
 
-          // Critical children
-          let criticalCases = 0;
-          try {
-            const critsSnap = await getDocs(query(
-              collection(db, 'children'),
-              where('ashaId', '==', aid),
-              where('riskLevel', '==', 'CRITICAL')
-            ));
-            criticalCases = critsSnap.size;
-          } catch (_) { /* composite index may not exist yet */ }
+            let submissionsThisMonth = 0;
+            let lastActive = null;
 
-          // Last active submission
-          let lastActive = null;
-          try {
-            const lastSnap = await getDocs(query(
-              collection(db, 'module_submissions'),
-              where('ashaId', '==', aid),
-              orderBy('submittedAt', 'desc'),
-              limit(1)
-            ));
-            if (!lastSnap.empty) {
-              const ts = lastSnap.docs[0].data().submittedAt;
-              lastActive = ts?.toDate ? ts.toDate() : (ts ? new Date(ts) : null);
+            try {
+              // Fetch from all real collections
+              await Promise.all(collectionsToFetch.map(async (collName) => {
+                try {
+                  const snap = await getDocs(query(
+                    collection(db, collName),
+                    where('ashaId', '==', aid)
+                  ));
+                  snap.docs.forEach(d => {
+                    const docData = d.data();
+                    const rawDate = docData.createdAt || docData.submittedAt || docData.surveyDate || docData.visitDate || docData.dateOfDeath;
+                    if (rawDate) {
+                      const dateObj = rawDate.toDate ? rawDate.toDate() : new Date(rawDate);
+                      if (dateObj >= monthStart) submissionsThisMonth++;
+                      if (!lastActive || dateObj > lastActive) {
+                        lastActive = dateObj;
+                      }
+                    }
+                  });
+                } catch (e) { /* ignore missing indexes */ }
+              }));
+            } catch (err) {
+              console.warn(err);
             }
-          } catch (_) { /* index may be missing */ }
 
-          return {
+            // Critical children
+            let criticalCases = 0;
+            try {
+              const critsSnap = await getDocs(query(
+                collection(db, 'children'),
+                where('ashaId', '==', aid),
+                where('riskLevel', '==', 'CRITICAL')
+              ));
+              criticalCases = critsSnap.size;
+            } catch (_) { /* composite index may not exist yet */ }
+
+            return {
             id: aid,
             name: data.name || aid,
             village: data.village || '—',

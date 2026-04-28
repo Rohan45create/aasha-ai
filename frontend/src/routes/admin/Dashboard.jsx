@@ -220,6 +220,36 @@ export default function AdminDashboard() {
             const dis = await getDocs(query(collection(db, 'disease_cases'), where('ashaId', '==', aid)));
             moduleCounts['Disease Cases'] += dis.size;
           } catch (e) { console.warn('[Dashboard] disease_cases error', e.code); }
+
+          // Referrals
+          try {
+            const refs = await getDocs(query(collection(db, 'referrals'), where('ashaId', '==', aid)));
+            refs.forEach(d => {
+              const data = d.data();
+              if (data.status === 'pending') {
+                allAlerts.push({
+                  id: d.id,
+                  type: 'pending_referral',
+                  ashaId: aid,
+                  message: `Pending NRC Referral: ${data.childName || 'Child'} — ${data.reason || 'Needs review'}`,
+                });
+              } else if (data.status === 'rejected') {
+                allAlerts.push({
+                  id: d.id,
+                  type: 'rejected_referral',
+                  ashaId: aid,
+                  message: `Rejected Referral: ${data.childName || 'Child'} — ${data.rejectionReason || 'No reason provided'}`,
+                });
+              } else if (data.status === 'admitted') {
+                allAlerts.push({
+                  id: d.id,
+                  type: 'admitted_referral',
+                  ashaId: aid,
+                  message: `Admitted to NRC: ${data.childName || 'Child'} — Follow up due on ${data.followUpDate || 'soon'}`,
+                });
+              }
+            });
+          } catch (e) { console.warn('[Dashboard] referrals error', e.code); }
         }
 
         // Pending reviews
@@ -355,12 +385,30 @@ export default function AdminDashboard() {
               {tx('All systems nominal. No critical cases.')}
             </div>
           ) : (
-            alerts.map(a => (
-              <div key={a.id} className="p-4 bg-[#FCEBEB] text-[#791F1F] rounded-xl font-medium border border-[#E24B4A] text-sm flex items-start gap-2">
-                <span className="material-symbols-outlined text-lg flex-shrink-0">warning</span>
-                <span>{a.message}</span>
-              </div>
-            ))
+            alerts.map(a => {
+              let config = {
+                bg: 'bg-[#FCEBEB]',
+                border: 'border-[#E24B4A]',
+                text: 'text-[#791F1F]',
+                icon: 'warning',
+                iconColor: 'text-[#E24B4A]'
+              };
+              
+              if (a.type === 'pending_referral') {
+                config = { bg: 'bg-[#FFF8E1]', border: 'border-[#BA7517]', text: 'text-[#8A560B]', icon: 'pending_actions', iconColor: 'text-[#BA7517]' };
+              } else if (a.type === 'rejected_referral') {
+                config = { bg: 'bg-gray-100', border: 'border-gray-400', text: 'text-gray-700', icon: 'cancel', iconColor: 'text-gray-500' };
+              } else if (a.type === 'admitted_referral') {
+                config = { bg: 'bg-[#EAF3DE]', border: 'border-[#1D9E75]', text: 'text-[#085041]', icon: 'local_hospital', iconColor: 'text-[#1D9E75]' };
+              }
+
+              return (
+                <div key={a.id} className={`p-4 ${config.bg} ${config.text} rounded-xl font-medium border ${config.border} text-sm flex items-start gap-2`}>
+                  <span className={`material-symbols-outlined text-lg flex-shrink-0 ${config.iconColor}`}>{config.icon}</span>
+                  <span>{a.message}</span>
+                </div>
+              );
+            })
           )}
           <div className="p-4 bg-gray-50 text-gray-600 rounded-xl text-sm flex items-center gap-2 border border-gray-200">
             <span className="material-symbols-outlined text-lg text-gray-400">schedule</span>
