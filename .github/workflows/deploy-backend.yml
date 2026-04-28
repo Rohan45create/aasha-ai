@@ -27,7 +27,7 @@ jobs:
           cd backend
           gcloud run deploy aasha-api \
             --source . \
-            --region us-central1 \
+            --region asia-south1 \
             --allow-unauthenticated \
-            --set-env-vars="ENVIRONMENT=production" \
-            --set-secrets="FIREBASE_SERVICE_ACCOUNT_JSON=firebase-service-account:latest"
+            --project ashaai-prod \
+            --set-env-vars="ENVIRONMENT=production"
