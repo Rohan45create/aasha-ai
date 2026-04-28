@@ -30,4 +30,4 @@ jobs:
             --region asia-south1 \
             --allow-unauthenticated \
             --project ashaai-prod \
-            --set-env-vars="ENVIRONMENT=production"
+            --set-env-vars="ENVIRONMENT=production,ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}"

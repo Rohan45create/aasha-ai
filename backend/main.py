@@ -36,7 +36,7 @@ async def add_security_headers(request: Request, call_next):
 # Apply Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,https://ashaai-app.web.app").split(","),
+    allow_origins=os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174").split(","),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT"],  # No DELETE — data is permanent
     allow_headers=["Authorization", "Content-Type"],
