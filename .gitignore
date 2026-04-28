@@ -29,6 +29,7 @@ firebase-debug.log
 .agents
 .gemini
 .gsd
+.claude
 adapters
 docs
 scripts

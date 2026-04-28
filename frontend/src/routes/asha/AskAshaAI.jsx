@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useAuthStore } from '../../stores/authStore';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useTx } from '../../context/TranslationContext';
@@ -221,8 +223,14 @@ export default function AskAshaAI() {
                   <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>mic</span> Voice
                 </span>
               )}
-              {/* Message content — preserve line breaks */}
-              <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+              {/* Message content — render markdown for AI, plain text for user */}
+              {m.role === 'ai' && !m.isError ? (
+                <div className="markdown-body">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+              )}
               {m.isError && (
                 <button
                   onClick={handleRetry}
