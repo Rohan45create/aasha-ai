@@ -182,3 +182,87 @@
     border-right-color: var(--border);
   }
 }
+
+/* ── Chat Markdown Renderer ── */
+.markdown-body {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #1A1A18;
+}
+.markdown-body p {
+  margin: 0 0 8px 0;
+}
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
+  font-weight: 700;
+  margin: 10px 0 6px 0;
+  line-height: 1.3;
+  color: #085041;
+}
+.markdown-body h1 { font-size: 16px; }
+.markdown-body h2 { font-size: 15px; }
+.markdown-body h3 { font-size: 14px; }
+.markdown-body ul, .markdown-body ol {
+  margin: 4px 0 8px 0 !important;
+  padding-left: 20px !important;
+}
+.markdown-body ul {
+  list-style-type: disc !important;
+}
+.markdown-body ol {
+  list-style-type: decimal !important;
+}
+.markdown-body li {
+  margin: 3px 0 !important;
+  display: list-item !important;
+}
+.markdown-body strong {
+  font-weight: 700;
+  color: #085041;
+}
+.markdown-body em {
+  font-style: italic;
+}
+.markdown-body code {
+  background: #EAF3DE;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #085041;
+}
+.markdown-body pre {
+  background: #EAF3DE;
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+.markdown-body pre code {
+  background: none;
+  padding: 0;
+}
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid #E8E7E0;
+  margin: 8px 0;
+}
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 6px 0;
+}
+.markdown-body th {
+  background: #EAF3DE;
+  color: #085041;
+  font-weight: 700;
+  padding: 6px 8px;
+  border: 1px solid #D3D1C7;
+}
+.markdown-body td {
+  padding: 5px 8px;
+  border: 1px solid #D3D1C7;
+}
