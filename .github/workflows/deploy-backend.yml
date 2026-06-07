@@ -25,12 +25,16 @@ jobs:
       - name: Deploy to Cloud Run
         env:
           ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
         run: |
           cd backend
-          printf 'ENVIRONMENT: "production"\nALLOWED_ORIGINS: "%s"\n' "$ALLOWED_ORIGINS" > /tmp/env-vars.yaml
+          printf 'ENVIRONMENT: "production"\nALLOWED_ORIGINS: "%s"\nREDIS_URL: "%s"\n' \
+            "$ALLOWED_ORIGINS" "$REDIS_URL" > /tmp/env-vars.yaml
           gcloud run deploy aasha-api \
             --source . \
             --region asia-south1 \
             --allow-unauthenticated \
             --project ashaai-prod \
+            --vpc-connector=ashaai-connector \
+            --vpc-egress=private-ranges-only \
             --env-vars-file=/tmp/env-vars.yaml
