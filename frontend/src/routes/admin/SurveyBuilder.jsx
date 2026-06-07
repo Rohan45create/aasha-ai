@@ -71,25 +71,17 @@ export default function SurveyBuilder() {
   };
 
   const translateApiCall = async (text) => {
-    const token = await user?.getIdToken();
-    
-    const translateTo = async (targetLang) => {
-      const res = await fetch(`${BACKEND_URL}/api/translate/batch`, {
+    try {
+      const { apiFetch } = await import('../../utils/api');
+      const data = await apiFetch('/api/admin/translate', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texts: [text], target_language: targetLang, source_language: 'en' })
+        body: JSON.stringify({ text })
       });
-      if (!res.ok) throw new Error(`Translation to ${targetLang} failed`);
-      const data = await res.json();
-      return data.translations[0]?.translated || text;
-    };
-
-    const [mr, hi] = await Promise.all([
-      translateTo('mr').catch(() => text),
-      translateTo('hi').catch(() => text)
-    ]);
-
-    return { mr, hi };
+      return data;
+    } catch (err) {
+      console.warn('Translation error:', err);
+      return { mr: text, hi: text };
+    }
   };
 
   const autoTranslateTitle = async () => {

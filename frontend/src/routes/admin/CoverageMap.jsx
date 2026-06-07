@@ -1,25 +1,9 @@
 import { useJsApiLoader, GoogleMap, Circle, InfoWindow, Marker } from '@react-google-maps/api';
 import { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { useAuthStore } from '../../stores/authStore';
 import { useTx } from '../../context/TranslationContext';
-
-const FALLBACK_ASHA_IDS = [
-  'asha_lata_001', 'asha_priya_002', 'asha_kavita_003',
-  'asha_meena_004', 'asha_anita_005'
-];
-
-// Beed district approximate center coordinates per village
-const VILLAGE_COORDS = {
-  'Pimpalgaon': { lat: 19.42, lng: 75.85 },
-  'Shirur':     { lat: 19.40, lng: 75.92 },
-  'Parli':      { lat: 18.85, lng: 76.53 },
-  'Georai':     { lat: 19.27, lng: 75.73 },
-  'Beed City':  { lat: 18.99, lng: 75.76 },
-  'Manjlegaon': { lat: 19.15, lng: 76.22 },
-  'Ambajogai':  { lat: 18.73, lng: 76.38 },
-};
 
 const CoverageMap = () => {
   const [villages, setVillages]           = useState([]);
@@ -27,6 +11,7 @@ const CoverageMap = () => {
   const [selectedVillage, setSelectedVillage] = useState(null);
   const [loadError, setLoadError]         = useState(null);
   const [mapType, setMapType]             = useState('roadmap');
+  const [mapCenter, setMapCenter]         = useState({ lat: 18.99, lng: 75.76 });
   const tx = useTx();
 
   const { headId: storeHeadId } = useAuthStore();
@@ -40,64 +25,134 @@ const CoverageMap = () => {
   useEffect(() => {
     if (!headId) return;
 
-    // Use fallback IDs directly — no async getDoc needed here since we
-    // always scope to the known ASHA IDs to avoid full-collection scans
-    const ashaIds = FALLBACK_ASHA_IDS;
+    let ashasUnsub = () => {};
+    let childrenUnsub = () => {};
+    let householdsUnsub = () => {};
 
-    // Real-time household aggregation filtered to this supervisor's ASHAs
-    const householdsUnsub = onSnapshot(
-      query(collection(db, 'households')),
-      (snap) => {
-        const villageMap = {};
-        snap.forEach(d => {
-          const data = d.data();
-          // Filter to only households belonging to this head's ASHAs
-          if (!ashaIds.includes(data.ashaId)) return;
+    const headUnsub = onSnapshot(doc(db, 'asha_heads', headId), (headSnap) => {
+      if (!headSnap.exists()) {
+        console.error("Head doc not found");
+        return;
+      }
+      const headData = headSnap.data();
+      const ashaIds = headData.ashaIds || [];
+      
+      if (ashaIds.length === 0) {
+        setVillages([]);
+        return;
+      }
 
-          const v = data.village || 'Unknown';
-          if (!villageMap[v]) {
-            // Use known coords if available, otherwise use stored GPS or randomize in Beed region
-            const known = VILLAGE_COORDS[v];
-            villageMap[v] = {
-              name: v,
-              total: 0,
-              critical: 0,
-              lat: known?.lat ?? (data.gpsLat || 18.75 + (Math.random() - 0.5) * 1.5),
-              lng: known?.lng ?? (data.gpsLng || 75.71 + (Math.random() - 0.5) * 1.5),
-            };
-          }
-          villageMap[v].total++;
-          if (data.hasCriticalCase) villageMap[v].critical++;
-        });
-        setVillages(Object.values(villageMap));
-      },
-      (err) => console.error('Households snapshot error:', err)
-    );
+      ashasUnsub();
+      ashasUnsub = onSnapshot(
+        query(collection(db, 'ashas'), where('supervisorId', '==', headId)),
+        (ashaSnap) => {
+          const ashaMap = {}; 
+          const active = [];
+          ashaSnap.forEach(d => {
+            const data = d.data();
+            ashaMap[d.id] = data;
+            if (data.isActive) {
+              active.push({
+                id: d.id,
+                name: data.name || d.id,
+                lat: data.lastKnownLocation?.lat ?? (18.75 + (Math.random() - 0.5) * 0.5),
+                lng: data.lastKnownLocation?.lng ?? (75.71 + (Math.random() - 0.5) * 0.5),
+              });
+            }
+          });
+          setActiveAshas(active);
 
-    // Real-time ASHA worker locations (filtered to this head)
-    const ashasUnsub = onSnapshot(
-      query(collection(db, 'ashas'), where('supervisorId', '==', headId)),
-      (snap) => {
-        const active = [];
-        snap.forEach(d => {
-          const data = d.data();
-          if (data.isActive) {
-            active.push({
-              id: d.id,
-              name: data.name || d.id,
-              lat: data.lastKnownLocation?.lat ?? (18.75 + (Math.random() - 0.5) * 0.5),
-              lng: data.lastKnownLocation?.lng ?? (75.71 + (Math.random() - 0.5) * 0.5),
-            });
-          }
-        });
-        setActiveAshas(active);
-      },
-      (err) => console.error('ASHA snapshot error:', err)
-    );
+          childrenUnsub();
+          childrenUnsub = onSnapshot(
+            query(collection(db, 'children'), where('ashaId', 'in', ashaIds)),
+            (childSnap) => {
+              const criticalByAsha = {};
+              childSnap.forEach(d => {
+                const data = d.data();
+                if (data.riskLevel === 'CRITICAL') {
+                  criticalByAsha[data.ashaId] = (criticalByAsha[data.ashaId] || 0) + 1;
+                }
+              });
+
+              householdsUnsub();
+              householdsUnsub = onSnapshot(
+                query(collection(db, 'households'), where('ashaId', 'in', ashaIds)),
+                (hhSnap) => {
+                  console.log(`Households query returned ${hhSnap.size} documents.`);
+                  if (!hhSnap.empty) {
+                    console.log("First document:", hhSnap.docs[0].data());
+                  }
+
+                  const vMap = {};
+                  let totalLat = 0;
+                  let totalLng = 0;
+                  let validGpsCount = 0;
+
+                  hhSnap.forEach(d => {
+                    const data = d.data();
+                    const ashaId = data.ashaId;
+                    const ashaInfo = ashaMap[ashaId] || {};
+                    const v = data.village || ashaInfo.village || 'Unknown';
+
+                    if (!vMap[v]) {
+                      vMap[v] = {
+                        name: v,
+                        total: 0,
+                        critical: 0,
+                        sumLat: 0,
+                        sumLng: 0,
+                        gpsCount: 0,
+                        coveragePercent: ashaInfo.coveragePercent || 0,
+                        ashaName: ashaInfo.name || 'Unknown',
+                        ashaId: ashaId
+                      };
+                    }
+
+                    vMap[v].total++;
+                    if (data.gpsLat && data.gpsLng) {
+                      vMap[v].sumLat += data.gpsLat;
+                      vMap[v].sumLng += data.gpsLng;
+                      vMap[v].gpsCount++;
+                      
+                      totalLat += data.gpsLat;
+                      totalLng += data.gpsLng;
+                      validGpsCount++;
+                    }
+                  });
+
+                  const finalVillages = Object.values(vMap).map(v => {
+                    v.critical = criticalByAsha[v.ashaId] || 0;
+                    return {
+                      ...v,
+                      lat: v.gpsCount > 0 ? v.sumLat / v.gpsCount : 18.75,
+                      lng: v.gpsCount > 0 ? v.sumLng / v.gpsCount : 75.71,
+                    };
+                  });
+                  
+                  setVillages(finalVillages);
+
+                  if (validGpsCount > 0) {
+                    setMapCenter({
+                      lat: totalLat / validGpsCount,
+                      lng: totalLng / validGpsCount
+                    });
+                  }
+                },
+                (err) => console.error('Households snapshot error:', err)
+              );
+            },
+            (err) => console.error('Children snapshot error:', err)
+          );
+        },
+        (err) => console.error('ASHA snapshot error:', err)
+      );
+    });
 
     return () => {
-      householdsUnsub();
+      headUnsub();
       ashasUnsub();
+      childrenUnsub();
+      householdsUnsub();
     };
   }, [headId]);
 
@@ -131,7 +186,6 @@ const CoverageMap = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-[#D3D1C7] overflow-hidden mb-6 relative">
-        {/* Satellite Toggle */}
         <button
           onClick={() => setMapType(t => t === 'roadmap' ? 'satellite' : 'roadmap')}
           className="absolute top-3 right-3 z-10 bg-white shadow-md border border-gray-200 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1 hover:bg-gray-50 transition-colors"
@@ -142,19 +196,19 @@ const CoverageMap = () => {
         </button>
         <GoogleMap
           mapContainerStyle={{ width: '100%', height: '480px' }}
-          center={{ lat: 18.99, lng: 75.76 }}
-          zoom={9}
+          center={mapCenter}
+          zoom={11}
           options={{ mapTypeControl: false, streetViewControl: false, mapTypeId: mapType }}
         >
           {villages.map(v => (
             <Circle
               key={v.name}
               center={{ lat: v.lat, lng: v.lng }}
-              radius={Math.max(800, v.total * 120)}
+              radius={Math.min(2500, Math.max(800, v.total * 120))}
               options={{
-                fillColor: v.critical > 0 ? '#E24B4A' : v.total < 10 ? '#BA7517' : '#1D9E75',
+                fillColor: v.critical > 0 ? '#E24B4A' : v.coveragePercent < 70 ? '#BA7517' : '#1D9E75',
                 fillOpacity: 0.35,
-                strokeColor: v.critical > 0 ? '#E24B4A' : '#1D9E75',
+                strokeColor: v.critical > 0 ? '#E24B4A' : v.coveragePercent < 70 ? '#BA7517' : '#1D9E75',
                 strokeWeight: 2,
                 cursor: 'pointer',
               }}
@@ -188,13 +242,17 @@ const CoverageMap = () => {
             >
               <div className="p-1 min-w-[120px]">
                 <strong className="block text-sm mb-1">{selectedVillage.name}</strong>
-                {!selectedVillage.isWorker && (
+                {!selectedVillage.isWorker ? (
                   <>
-                    <p className="text-xs text-gray-600">{selectedVillage.total} {tx('families', 'families')}</p>
-                    {selectedVillage.critical > 0 && (
-                      <p className="text-xs text-red-600 font-bold">{selectedVillage.critical} {tx('critical cases', 'critical_cases')}</p>
-                    )}
+                    <p className="text-xs text-gray-600"><strong>ASHA:</strong> {selectedVillage.ashaName}</p>
+                    <p className="text-xs text-gray-600"><strong>Households:</strong> {selectedVillage.total}</p>
+                    <p className="text-xs text-gray-600"><strong>Coverage:</strong> {selectedVillage.coveragePercent}%</p>
+                    <p className={`text-xs font-bold ${selectedVillage.critical > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      <strong>Critical Cases:</strong> {selectedVillage.critical}
+                    </p>
                   </>
+                ) : (
+                  <p className="text-xs text-gray-600">ASHA Worker Location</p>
                 )}
               </div>
             </InfoWindow>
@@ -202,7 +260,6 @@ const CoverageMap = () => {
         </GoogleMap>
       </div>
 
-      {/* Legend */}
       <div className="flex items-center gap-6 px-4 py-3 bg-gray-50 border-t border-[#D3D1C7] text-xs text-[#5F5E5A]">
         <span className="font-semibold">{tx('Legend')}:</span>
         <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-[#1D9E75] inline-block opacity-70"/> {tx('Good coverage (≥70%)')}</span>
@@ -210,7 +267,6 @@ const CoverageMap = () => {
         <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-[#E24B4A] inline-block opacity-70"/> {tx('Critical cases present')}</span>
       </div>
 
-      {/* Village Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {villages.length === 0 && (
           <p className="text-[#5F5E5A] p-4 col-span-3">
@@ -232,7 +288,7 @@ const VillageCard = ({ v, onClick, tx }) => (
   >
     <div className="flex items-center justify-between mb-3">
       <h3 className="font-bold text-[#1A1A18]">{v.name}</h3>
-      <span className={`w-3 h-3 rounded-full ${v.critical > 0 ? 'bg-[#E24B4A]' : v.total < 10 ? 'bg-[#BA7517]' : 'bg-[#1D9E75]'}`} />
+      <span className={`w-3 h-3 rounded-full ${v.critical > 0 ? 'bg-[#E24B4A]' : v.coveragePercent < 70 ? 'bg-[#BA7517]' : 'bg-[#1D9E75]'}`} />
     </div>
     <div className="grid grid-cols-2 gap-2 text-center">
       <div>

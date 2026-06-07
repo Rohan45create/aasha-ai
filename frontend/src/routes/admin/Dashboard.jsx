@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { db } from '../../firebase';
 import {
   collection, query, where,
-  getDoc, doc, getDocs
+  getDoc, doc, getDocs, onSnapshot, orderBy, limit, Timestamp
 } from 'firebase/firestore';
 import { useTx } from '../../context/TranslationContext';
+import { apiFetch } from '../../utils/api';
 
 const FALLBACK_ASHA_IDS = [
   'asha_lata_001', 'asha_priya_002', 'asha_kavita_003',
@@ -119,6 +120,8 @@ function MiniBarChart({ data, title }) {
 
 export default function AdminDashboard() {
   const tx = useTx();
+  const { docId } = useAuthStore();
+
   const [stats, setStats] = useState({
     workerCount: 0,
     activeToday: 0,
@@ -129,159 +132,133 @@ export default function AdminDashboard() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Workers table state
+  const [workers, setWorkers] = useState([]);
+  const [workersLoading, setWorkersLoading] = useState(true);
+  const [workersError, setWorkersError] = useState('');
+
   // Chart data
   const [moduleChart, setModuleChart] = useState([]);
   const [riskChart, setRiskChart] = useState([]);
   const [workerActivityChart, setWorkerActivityChart] = useState([]);
 
-  const { user, headId: storeHeadId } = useAuthStore();
-  const headId = storeHeadId || localStorage.getItem('headId') || 'head_sunita_001';
-
+  // Part C: Real-time alerts
   useEffect(() => {
-    if (!headId) return;
+    if (!docId) return;
+
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', docId),
+      where('isRead', '==', false),
+      orderBy('createdAt', 'desc'),
+      limit(10)
+    );
+
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const newAlerts = snap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        // Map to existing alert structure for UI
+        type: doc.data().type || 'info',
+        message: doc.data().message || doc.data().title
+      }));
+      setAlerts(newAlerts);
+    }, (error) => {
+      console.error('[Dashboard] Alerts onSnapshot error:', error);
+    });
+
+    return () => unsubscribe();
+  }, [docId]);
+
+  // Part A: Metrics cards
+  useEffect(() => {
+    if (!docId) return;
     let isUnmounted = false;
 
     const loadStats = async () => {
       try {
-        console.log('[Dashboard] Using headId:', headId);
-        const headDoc = await getDoc(doc(db, 'asha_heads', headId));
-        if (!headDoc.exists()) {
-          console.warn('[Dashboard] No asha_heads doc for headId:', headId);
+        setLoading(true);
+        const headDoc = await getDoc(doc(db, 'asha_heads', docId));
+        const ashaIds = headDoc.exists() && headDoc.data().ashaIds ? headDoc.data().ashaIds : [];
+
+        if (ashaIds.length === 0) {
+          if (!isUnmounted) setLoading(false);
+          return;
         }
-        const ashaIds = headDoc.exists()
-          ? (headDoc.data()?.ashaIds?.length > 0 ? headDoc.data().ashaIds : FALLBACK_ASHA_IDS)
-          : FALLBACK_ASHA_IDS;
-        console.log('[Dashboard] Using ashaIds:', ashaIds);
 
-        let totalFamilies = 0;
-        let criticalCases = 0;
-        const allAlerts = [];
+        // Note: Firestore 'in' queries support max 30 items. Since we have 5 ASHAs this is fine.
+        
+        // Critical Cases
+        const criticalSnap = await getDocs(
+          query(collection(db, 'children'), where('ashaId', 'in', ashaIds), where('riskLevel', '==', 'CRITICAL'))
+        );
+        
+        // Total Families
+        const familiesSnap = await getDocs(
+          query(collection(db, 'households'), where('ashaId', 'in', ashaIds))
+        );
 
-        // Risk level counts — single where query, filter client-side
-        const riskCounts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
-
-        // Module counts from real seeded collections
-        const moduleCounts = {
-          'Family Survey': 0,
-          'ANC': 0,
-          'Child Growth': 0,
-          'Vaccination': 0,
-          'Pregnancies': 0,
-          'Disease Cases': 0,
-        };
-
-        // Worker activity — households per worker
-        const workerActivity = {};
-
-        for (const aid of ashaIds) {
-          // Families (households)
-          try {
-            const fams = await getDocs(query(collection(db, 'households'), where('ashaId', '==', aid)));
-            totalFamilies += fams.size;
-            moduleCounts['Family Survey'] += fams.size;
-            workerActivity[aid] = fams.size;
-          } catch (e) { console.warn('[Dashboard] households error', e.code); }
-
-          // Children — single where, filter risk client-side
-          try {
-            const allChildren = await getDocs(query(collection(db, 'children'), where('ashaId', '==', aid)));
-            moduleCounts['Child Growth'] += allChildren.size;
-            allChildren.forEach(d => {
-              const data = d.data();
-              const level = data.riskLevel || 'LOW';
-              if (riskCounts[level] !== undefined) riskCounts[level]++;
-              if (level === 'CRITICAL') {
-                criticalCases++;
-                allAlerts.push({
-                  id: d.id,
-                  type: 'critical',
-                  ashaId: aid,
-                  message: `${data.name || 'Child'} (Score: ${data.riskScore || '?'}) — ${data.riskPrimaryDriver || 'Urgent intervention needed'}`,
-                });
-              }
-            });
-          } catch (e) { console.warn('[Dashboard] children error', e.code); }
-
-          // Pregnancies
-          try {
-            const pregs = await getDocs(query(collection(db, 'pregnancies'), where('ashaId', '==', aid)));
-            moduleCounts['Pregnancies'] += pregs.size;
-            moduleCounts['ANC'] += pregs.size; // proxy
-          } catch (e) { console.warn('[Dashboard] pregnancies error', e.code); }
-
-          // Vaccinations
-          try {
-            const vax = await getDocs(query(collection(db, 'vaccinations'), where('ashaId', '==', aid)));
-            moduleCounts['Vaccination'] += vax.size;
-          } catch (e) { console.warn('[Dashboard] vaccinations error', e.code); }
-
-          // Disease cases
-          try {
-            const dis = await getDocs(query(collection(db, 'disease_cases'), where('ashaId', '==', aid)));
-            moduleCounts['Disease Cases'] += dis.size;
-          } catch (e) { console.warn('[Dashboard] disease_cases error', e.code); }
-
-          // Referrals
-          try {
-            const refs = await getDocs(query(collection(db, 'referrals'), where('ashaId', '==', aid)));
-            refs.forEach(d => {
-              const data = d.data();
-              if (data.status === 'pending') {
-                allAlerts.push({
-                  id: d.id,
-                  type: 'pending_referral',
-                  ashaId: aid,
-                  message: `Pending NRC Referral: ${data.childName || 'Child'} — ${data.reason || 'Needs review'}`,
-                });
-              } else if (data.status === 'rejected') {
-                allAlerts.push({
-                  id: d.id,
-                  type: 'rejected_referral',
-                  ashaId: aid,
-                  message: `Rejected Referral: ${data.childName || 'Child'} — ${data.rejectionReason || 'No reason provided'}`,
-                });
-              } else if (data.status === 'admitted') {
-                allAlerts.push({
-                  id: d.id,
-                  type: 'admitted_referral',
-                  ashaId: aid,
-                  message: `Admitted to NRC: ${data.childName || 'Child'} — Follow up due on ${data.followUpDate || 'soon'}`,
-                });
-              }
-            });
-          } catch (e) { console.warn('[Dashboard] referrals error', e.code); }
-        }
+        // Active Today (Fix: proper Firestore Timestamp)
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayStartTs = Timestamp.fromDate(todayStart);
+        
+        const activeSnap = await getDocs(
+          query(collection(db, 'module_submissions'), where('ashaId', 'in', ashaIds), where('submittedAt', '>=', todayStartTs))
+        );
+        
+        const activeAshaIds = new Set();
+        activeSnap.forEach(d => activeAshaIds.add(d.data().ashaId));
 
         // Pending reviews
-        let pendingReviews = 0;
-        try {
-          const pending = await getDocs(query(collection(db, 'pending_reviews'), where('reviewStatus', '==', 'pending')));
-          pendingReviews = pending.size;
-        } catch (_) {}
+        const pendingSnap = await getDocs(query(collection(db, 'pending_reviews'), where('reviewStatus', '==', 'pending')));
 
-        // Active today — use workers who have ANY households (proxy for activity)
-        const activeToday = Object.values(workerActivity).filter(v => v > 0).length;
-
-        // Format chart data
-        const moduleData = Object.entries(moduleCounts)
-          .map(([k, v]) => ({ label: k, value: v }))
-          .filter(d => d.value > 0)
-          .sort((a, b) => b.value - a.value);
-
-        const riskData = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
-          .map(k => ({ label: k, value: riskCounts[k] }))
-          .filter(d => d.value > 0);
-
-        const workerNames = { asha_lata_001: 'Lata', asha_priya_002: 'Priya', asha_kavita_003: 'Kavita', asha_meena_004: 'Meena', asha_anita_005: 'Anita' };
-        const workerData = Object.entries(workerActivity)
-          .map(([id, v]) => ({ label: workerNames[id] || id.split('_')[1] || id, value: v }));
+        // ------------------
+        // CHART DATA BUILDER
+        // ------------------
+        
+        // 1. Risk Chart (all 4 levels)
+        const allChildrenSnap = await getDocs(
+          query(collection(db, 'children'), where('ashaId', 'in', ashaIds))
+        );
+        const rCounts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+        allChildrenSnap.forEach(d => {
+          const risk = d.data().riskLevel;
+          if (rCounts[risk] !== undefined) rCounts[risk]++;
+        });
+        
+        // 2. Module & Worker Charts (fetch recent submissions)
+        const allSubsSnap = await getDocs(
+          query(collection(db, 'module_submissions'), where('ashaId', 'in', ashaIds))
+        );
+        const wCounts = {};
+        const mCounts = {};
+        allSubsSnap.forEach(d => {
+          const data = d.data();
+          const mod = data.moduleType || 'unknown';
+          const asha = data.ashaId;
+          wCounts[asha] = (wCounts[asha] || 0) + 1;
+          mCounts[mod] = (mCounts[mod] || 0) + 1;
+        });
 
         if (!isUnmounted) {
-          setStats({ workerCount: ashaIds.length, activeToday, totalFamilies, criticalCases, pendingReviews });
-          setAlerts(allAlerts);
-          setModuleChart(moduleData);
-          setRiskChart(riskData);
-          setWorkerActivityChart(workerData);
+          setStats({
+            workerCount: ashaIds.length,
+            criticalCases: criticalSnap.size,
+            totalFamilies: familiesSnap.size,
+            activeToday: activeAshaIds.size,
+            pendingReviews: pendingSnap.size
+          });
+          
+          setRiskChart([
+            { label: 'CRITICAL', value: rCounts.CRITICAL },
+            { label: 'HIGH', value: rCounts.HIGH },
+            { label: 'MEDIUM', value: rCounts.MEDIUM },
+            { label: 'LOW', value: rCounts.LOW }
+          ]);
+          setWorkerActivityChart(Object.entries(wCounts).map(([k, v]) => ({ label: k, value: v })));
+          setModuleChart(Object.entries(mCounts).map(([k, v]) => ({ label: k, value: v })));
+          
           setLoading(false);
         }
       } catch (err) {
@@ -291,10 +268,45 @@ export default function AdminDashboard() {
     };
 
     loadStats();
-
     return () => { isUnmounted = true; };
-  }, [headId]);
+  }, [docId]);
 
+  // Part B: Workers Table Data
+  useEffect(() => {
+    if (!docId) return;
+    let isUnmounted = false;
+
+    const loadWorkers = async () => {
+      try {
+        setWorkersLoading(true);
+        setWorkersError('');
+        const data = await apiFetch(`/api/admin/supervisor/workers/${docId}`);
+        if (!isUnmounted) {
+          setWorkers(data);
+          setWorkersLoading(false);
+        }
+      } catch (err) {
+        console.error('[Dashboard] Workers fetch error:', err);
+        if (!isUnmounted) {
+          setWorkersError('Failed to load workers.');
+          setWorkersLoading(false);
+        }
+      }
+    };
+
+    loadWorkers();
+    return () => { isUnmounted = true; };
+  }, [docId]);
+
+  const workerActivityChartWithNames = useMemo(() => {
+    if (!workerActivityChart.length || !workers.length) return workerActivityChart;
+    const nameMap = {};
+    workers.forEach(w => nameMap[w.id] = w.name);
+    return workerActivityChart.map(item => ({
+      ...item,
+      label: nameMap[item.label] || item.label.slice(0, 8) + '...'
+    }));
+  }, [workerActivityChart, workers]);
 
   const cards = [
     { label: tx('ASHA Workers', 'total_workers'), value: stats.workerCount, icon: 'group', color: 'text-[#085041]', bg: 'bg-[#EAF3DE]' },
@@ -304,7 +316,7 @@ export default function AdminDashboard() {
     { label: tx('Pending Reviews', 'pending_reviews'), value: stats.pendingReviews, icon: 'pending_actions', color: 'text-[#BA7517]', bg: 'bg-[#FFF8E1]' },
   ];
 
-  if (loading) {
+  if (!docId || loading) {
     return (
       <div className="p-4 md:p-8">
         <div className="flex items-center justify-between mb-6">
@@ -323,7 +335,7 @@ export default function AdminDashboard() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl md:text-3xl font-bold">{tx('Admin Dashboard', 'admin_dashboard')}</h1>
         <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full font-mono">
-          {headId}
+          {docId}
         </span>
       </div>
 
@@ -366,11 +378,64 @@ export default function AdminDashboard() {
       </div>
 
       {/* Worker Activity This Week */}
-      {workerActivityChart.length > 0 && (
+      {workerActivityChartWithNames.length > 0 && (
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-[#D3D1C7] mb-8">
-          <MiniBarChart data={workerActivityChart} title="Worker Activity This Week (Submissions)" />
+          <MiniBarChart data={workerActivityChartWithNames} title="Worker Activity This Week (Submissions)" />
         </div>
       )}
+
+      {/* Workers Table */}
+      <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-[#D3D1C7] mb-8">
+        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+          <span className="material-symbols-outlined text-[#185FA5]">group</span>
+          {tx('ASHA Workers')}
+        </h2>
+        {workersLoading ? (
+          <div className="flex justify-center p-8">
+            <span className="material-symbols-outlined animate-spin text-3xl text-[#1D9E75]">refresh</span>
+          </div>
+        ) : workersError ? (
+          <div className="p-4 bg-[#FCEBEB] text-[#791F1F] rounded-xl font-medium border border-[#E24B4A] text-sm">
+            {workersError}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[#D3D1C7]">
+                  <th className="p-3 text-sm font-semibold text-[#5F5E5A]">{tx('Name')}</th>
+                  <th className="p-3 text-sm font-semibold text-[#5F5E5A]">{tx('Village')}</th>
+                  <th className="p-3 text-sm font-semibold text-[#5F5E5A]">{tx('Coverage')}</th>
+                  <th className="p-3 text-sm font-semibold text-[#5F5E5A]">{tx('Submissions')}</th>
+                  <th className="p-3 text-sm font-semibold text-[#5F5E5A]">{tx('Status')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workers.map(w => (
+                  <tr key={w.id} className="border-b border-[#D3D1C7] last:border-0 hover:bg-gray-50">
+                    <td className="p-3 text-sm font-medium text-[#1A1A18]">{w.name || w.id}</td>
+                    <td className="p-3 text-sm text-[#5F5E5A]">{w.village || '-'}</td>
+                    <td className="p-3 text-sm text-[#5F5E5A]">{w.coverage_percent || 0}%</td>
+                    <td className="p-3 text-sm text-[#5F5E5A]">{w.submissions_this_month || 0}</td>
+                    <td className="p-3 text-sm">
+                      {w.isActive ? (
+                        <span className="px-2 py-1 bg-[#EAF3DE] text-[#085041] rounded-lg text-xs font-bold border border-[#1D9E75]">Active</span>
+                      ) : (
+                        <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold border border-gray-300">Inactive</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {workers.length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="p-4 text-center text-sm text-gray-500">No workers found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* Alerts Panel */}
       <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-[#D3D1C7]">
