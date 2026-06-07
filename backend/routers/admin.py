@@ -16,6 +16,25 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 # ============================================================================
+# IDENTITY ENDPOINT
+# ============================================================================
+
+@router.post("/auth/resolve-identity")
+async def resolve_identity(user: dict = Depends(verify_firebase_token)):
+    """Resolve the user's identity and return their doc_id and role."""
+    if "doc_id" not in user:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "PROFILE_NOT_FOUND", "message": "Account not set up. Contact your supervisor."}
+        )
+    return {
+        "doc_id": user["doc_id"],
+        "role": user["role"],
+        "uid": user["uid"]
+    }
+
+
+# ============================================================================
 # TRANSLATION ENDPOINT
 # ============================================================================
 
@@ -30,7 +49,7 @@ async def translate_text(
         raise HTTPException(400, "text is required")
     try:
         from vertexai.generative_models import GenerativeModel, GenerationConfig
-        model = GenerativeModel("gemini-2.0-flash-001")
+        model = GenerativeModel("gemini-2.5-flash")
         prompt = (
             f'Translate the following English health survey label to Marathi and Hindi. '
             f'Return ONLY valid JSON: {{"mr": "marathi translation", "hi": "hindi translation"}}. '

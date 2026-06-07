@@ -71,7 +71,7 @@ async def transcribe_marathi(audio_bytes: bytes) -> str:
     return " ".join([r.alternatives[0].transcript for r in response.results])
 
 async def structure_for_module(transcript: str, module_type: str) -> dict:
-    model = GenerativeModel("gemini-2.0-flash-001")
+    model = GenerativeModel("gemini-2.5-flash")
     prompt = VOICE_PROMPTS.get(module_type, VOICE_PROMPTS["family_survey"])
     response = model.generate_content(
         prompt.replace("{transcript}", transcript),

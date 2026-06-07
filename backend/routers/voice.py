@@ -71,60 +71,86 @@ SPEECH TRANSCRIPT:
     return prompt
 
 
-async def transcribe_audio(audio_bytes: bytes) -> str:
-    client = speech.SpeechClient()
-    config = speech.RecognitionConfig(
-        encoding=speech.RecognitionConfig.AudioEncoding.WEBM_OPUS,
-        sample_rate_hertz=48000,
-        language_code="mr-IN",
-        alternative_language_codes=["hi-IN", "en-IN"],
-        enable_automatic_punctuation=True,
-    )
-    audio = speech.RecognitionAudio(content=audio_bytes)
-    response = client.recognize(config=config, audio=audio)
-    transcript = " ".join([r.alternatives[0].transcript for r in response.results if r.alternatives])
-    return transcript or ""
+from vertexai.generative_models import Part
 
+async def process_audio_with_gemini(audio_bytes: bytes, module_type: str, form_fields: Optional[list] = None) -> dict:
+    model = GenerativeModel("gemini-2.5-flash") # Use 1.5-flash for multimodal audio support
+    
+    audio_part = Part.from_data(data=audio_bytes, mime_type="audio/webm")
 
-async def structure_transcript(transcript: str, module_type: str, form_fields: Optional[list] = None) -> dict:
-    if not transcript:
-        return {}
-
-    model = GenerativeModel("gemini-2.5-flash")
-
-    # If the frontend sent its field definitions, build a dynamic prompt
     if form_fields and len(form_fields) > 0:
-        prompt_template = build_dynamic_prompt(form_fields)
+        schema_parts = []
+        for f in form_fields:
+            fid   = f.get("id", "")
+            label = f.get("label", fid)
+            ftype = f.get("type", "text")
+
+            if ftype == "date":
+                schema_parts.append(f'"{fid}": null  // {label} — format: YYYY-MM-DD if mentioned')
+            elif ftype == "number":
+                schema_parts.append(f'"{fid}": null  // {label} — numeric value only')
+            elif ftype == "checkbox":
+                schema_parts.append(f'"{fid}": null  // {label} — true or false')
+            elif ftype == "select":
+                schema_parts.append(f'"{fid}": null  // {label} — pick the closest matching option')
+            elif ftype == "textarea":
+                schema_parts.append(f'"{fid}": null  // {label} — free text summary')
+            else:
+                schema_parts.append(f'"{fid}": null  // {label}')
+
+        schema_str = "{\n      " + ",\n      ".join(schema_parts) + "\n    }"
+
+        prompt = f"""You are a healthcare data entry assistant for ASHA workers in India.
+Listen to the attached audio (which may be in Marathi, Hindi, or English) and extract the information.
+
+Return ONLY valid JSON with exactly two root keys:
+1. "transcript": A string containing the speech transcript in the original language.
+2. "fields": An object containing the extracted data.
+
+RULES for "fields":
+- Use EXACTLY the field IDs listed below (keys must match exactly).
+- Set a field to null if it was NOT mentioned in the speech — do not guess or invent values.
+- For date fields, convert spoken dates to YYYY-MM-DD format.
+- For number fields, extract only the numeric value.
+- For boolean/checkbox fields, use true or false.
+
+FIELDS SCHEMA:
+{schema_str}
+"""
     else:
-        # Fall back to static hardcoded prompt
         static_schema = VOICE_PROMPTS.get(module_type, VOICE_PROMPTS["family_survey"])
-        prompt_template = f"""Extract structured data from this Marathi/Hindi/English speech transcript.
-Return ONLY valid JSON with exactly these fields (null for any not mentioned):
+        prompt = f"""Listen to the attached audio (Marathi/Hindi/English) and extract structured data.
+Return ONLY valid JSON with two root keys:
+1. "transcript": The speech transcript.
+2. "fields": An object matching exactly this schema (null for any not mentioned):
 {static_schema}
-Transcript: """
+"""
 
     try:
         response = model.generate_content(
-            prompt_template + transcript,
+            [audio_part, prompt],
             generation_config=GenerationConfig(
                 response_mime_type="application/json",
-                temperature=0.1,  # Low temperature for deterministic extraction
+                temperature=0.1,
             )
         )
         result = json.loads(response.text)
-        # Remove null values — only return fields that were actually detected
-        cleaned = {k: v for k, v in result.items() if v is not None and v != "" and v != "null"}
-        return cleaned
+        transcript = result.get("transcript", "")
+        fields_raw = result.get("fields", {})
+        
+        # Remove null values
+        cleaned = {k: v for k, v in fields_raw.items() if v is not None and v != "" and v != "null"}
+        return {"transcript": transcript, "fields": cleaned}
     except Exception as e:
         print(f"[Voice] Gemini extraction error: {e}")
-        return {"_error": str(e)}
+        return {"transcript": "", "fields": {}, "error": str(e)}
 
 
 @router.post("/api/voice/transcribe")
 async def transcribe_voice(
     audio: UploadFile,
     module_type: str = Form("family_survey"),
-    form_fields: Optional[str] = Form(None),  # JSON string of [{id, label, type}, ...]
+    form_fields: Optional[str] = Form(None),
     user=Depends(verify_firebase_token)
 ):
     if not audio.filename:
@@ -135,18 +161,6 @@ async def transcribe_voice(
     if len(audio_bytes) < 1000:
         raise HTTPException(400, "Audio too short. Please speak for at least 2 seconds.")
 
-    transcript = await transcribe_audio(audio_bytes)
-    audio_bytes = None  # SECURITY: clear buffer immediately, never stored
-
-    if not transcript:
-        return {
-            "transcript": "",
-            "fields": {},
-            "module_type": module_type,
-            "error": "Could not understand audio. Please try again."
-        }
-
-    # Parse form_fields JSON if provided
     parsed_fields = None
     if form_fields:
         try:
@@ -154,10 +168,32 @@ async def transcribe_voice(
         except Exception:
             parsed_fields = None
 
-    structured_fields = await structure_transcript(transcript, module_type, parsed_fields)
+    result = await process_audio_with_gemini(audio_bytes, module_type, parsed_fields)
+    
+    # clear buffer immediately
+    audio_bytes = None
+
+    transcript = result.get("transcript", "")
+    fields_clean = result.get("fields", {})
+
+    if "error" in result:
+        return {
+            "transcript": "",
+            "fields": {},
+            "module_type": module_type,
+            "error": f"API Error: {result['error']}"
+        }
+
+    if not transcript and not fields_clean:
+        return {
+            "transcript": "",
+            "fields": {},
+            "module_type": module_type,
+            "error": "Could not understand audio. Please try again."
+        }
 
     # Remove internal error key before returning
-    fields_clean = {k: v for k, v in structured_fields.items() if not k.startswith("_")}
+    fields_clean = {k: v for k, v in fields_clean.items() if not k.startswith("_")}
 
     return {
         "transcript": transcript,

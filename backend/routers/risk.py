@@ -5,9 +5,14 @@ from datetime import datetime, timedelta
 from firebase_admin import firestore
 from vertexai.generative_models import GenerativeModel, GenerationConfig
 from middleware.auth_middleware import verify_firebase_token
+from services import redis_service
 
 logger = structlog.get_logger()
 router = APIRouter()
+
+async def _invalidate_asha_cache(asha_id: str):
+    """Call this whenever a survey is submitted or risk is recalculated."""
+    await redis_service.invalidate_priority(asha_id)
 
 @router.get("/api/risk/debug/{asha_id}")
 async def debug_risk(asha_id: str, user=Depends(verify_firebase_token)):
@@ -31,7 +36,7 @@ async def debug_risk(asha_id: str, user=Depends(verify_firebase_token)):
 async def calculate_risk_now(asha_id: str, user=Depends(verify_firebase_token)):
     """Run risk engine immediately for one ASHA worker (dev/demo use)"""
     db = firestore.client()
-    model = GenerativeModel("gemini-2.0-flash-001")
+    model = GenerativeModel("gemini-2.5-flash")
     
     children = list(db.collection("children").where("ashaId","==",asha_id).stream())
     updated = 0
@@ -84,10 +89,17 @@ SAM malnutrition = automatic CRITICAL. Days since visit >21 = HIGH minimum."""
         except Exception as e:
             logger.error("risk_calc_error", error=str(e), doc_id=child_doc.id)
     
+    await _invalidate_asha_cache(asha_id)
     return {"updated": updated, "asha_id": asha_id}
 
 @router.get("/api/risk/priority/{asha_id}")
 async def get_priority_list(asha_id: str, user=Depends(verify_firebase_token)):
+    # 1. Check Redis
+    cached_results = await redis_service.get_priority_list(asha_id)
+    if cached_results is not None:
+        logger.info("cache_hit", asha_id=asha_id)
+        return cached_results
+
     db = firestore.client()
     
     # Children by risk
@@ -152,4 +164,9 @@ async def get_priority_list(asha_id: str, user=Depends(verify_firebase_token)):
                 })
     
     results.sort(key=lambda x: x["risk_score"], reverse=True)
+    
+    # 3. Write to Redis
+    await redis_service.set_priority_list(asha_id, results)
+    logger.info("cache_miss_warmed", asha_id=asha_id)
+    
     return results
