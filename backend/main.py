@@ -8,6 +8,7 @@ from middleware.logging_middleware import LoggingMiddleware
 from middleware.auth_middleware import verify_firebase_token
 from config.firebase_config import initialize_firebase
 from config.gemini_config import configure_gemini
+from services.redis_service import init_redis, close_redis, ping as redis_ping
 
 # Import routers
 from routers.modules import family_survey
@@ -22,6 +23,14 @@ app = FastAPI(
     version="1.0.0",
     description="Backend API for the AshaAI Digital Companion"
 )
+
+@app.on_event("startup")
+async def startup_event():
+    await init_redis()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await close_redis()
 
 # Security headers middleware
 @app.middleware("http")
@@ -62,7 +71,12 @@ app.include_router(security.router)
 # Public endpoint
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "version": "1.0.0"}
+    redis_ok = await redis_ping()
+    return {
+        "status": "ok",
+        "version": "1.0.0",
+        "redis": "connected" if redis_ok else "unavailable"
+    }
 
 from middleware.rate_limit_middleware import RateLimitMiddleware
 app.add_middleware(RateLimitMiddleware, calls_per_minute=100)

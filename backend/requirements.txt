@@ -13,3 +13,6 @@ cryptography>=41.0.0
 structlog>=23.1.0
 python-multipart>=0.0.6
 websockets>=12.0
+
+# Cache layer
+redis[asyncio]==5.0.8
