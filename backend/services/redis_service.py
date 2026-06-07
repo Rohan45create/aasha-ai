@@ -140,7 +140,12 @@ async def init_redis() -> None:
         
     try:
         # decode_responses=True ensures we get strings back from Redis instead of bytes
-        _redis_client = aioredis.from_url(redis_url, decode_responses=True)
+        _redis_client = aioredis.from_url(
+            redis_url, 
+            decode_responses=True,
+            socket_timeout=3.0,
+            socket_connect_timeout=3.0
+        )
         await _redis_client.ping()
         logger.info("redis_initialized_successfully")
     except Exception as e:
