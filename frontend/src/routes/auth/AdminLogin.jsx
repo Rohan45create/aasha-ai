@@ -46,14 +46,8 @@ export default function AdminLogin() {
       const result = await signInWithEmailAndPassword(auth, email, password);
       const user = result.user;
 
-      const resolvedHeadId = await resolveHeadId(user);
+      await useAuthStore.getState().handleFirebaseLogin(user, navigate);
 
-      setUser(user);
-      setRole('asha_head');
-      setHeadId(resolvedHeadId);
-      localStorage.setItem('headId', resolvedHeadId);
-
-      navigate('/admin/dashboard');
     } catch (err) {
       console.error('[AdminLogin] Login error:', err);
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {

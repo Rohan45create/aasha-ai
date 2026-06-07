@@ -58,8 +58,11 @@ export default function ASHALogin() {
     setError('');
     setIsLoading(true);
     try {
-      await window.confirmationResult.confirm(otp);
-      navigate('/asha/home');
+      const result = await window.confirmationResult.confirm(otp);
+      const user = result.user;
+      
+      const { useAuthStore } = await import('../../stores/authStore');
+      await useAuthStore.getState().handleFirebaseLogin(user, navigate);
     } catch (err) {
       setError('Invalid OTP');
     } finally {
