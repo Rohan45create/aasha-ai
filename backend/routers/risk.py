@@ -94,6 +94,7 @@ SAM malnutrition = automatic CRITICAL. Days since visit >21 = HIGH minimum."""
 
 @router.get("/api/risk/priority/{asha_id}")
 async def get_priority_list(asha_id: str, user=Depends(verify_firebase_token)):
+    logger.info("priority_list_query", asha_id=asha_id, doc_id_source="from_request")
     # 1. Check Redis
     cached_results = await redis_service.get_priority_list(asha_id)
     if cached_results is not None:

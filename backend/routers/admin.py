@@ -329,15 +329,43 @@ async def publish_survey(
 ):
     """Publish a survey to assigned workers."""
     try:
+        from vertexai.generative_models import GenerativeModel
         db = firestore.Client()
+        
+        VALID_ICONS = ["house", "person", "baby", "syringe", "heart", "stethoscope", "clipboard", "microscope",
+                       "eye", "hand", "pill", "bandage", "pregnant", "elderly", "family", "village", "water",
+                       "shield", "chart", "leaf"]
+                       
+        icon_name = "clipboard"
+        try:
+            icon_prompt = f"""
+A health survey app has a new module called "{survey_data.get('title')}".
+Pick the single most appropriate icon from this list and return ONLY the icon name, nothing else:
+house, person, baby, syringe, heart, stethoscope, clipboard, microscope,
+eye, hand, pill, bandage, pregnant, elderly, family, village, water,
+shield, chart, leaf
+"""
+            model = GenerativeModel("gemini-2.0-flash-001")
+            response = model.generate_content(icon_prompt)
+            gen_icon = response.text.strip().lower()
+            if gen_icon in VALID_ICONS:
+                icon_name = gen_icon
+        except Exception as e:
+            logger.warning("icon_generation_failed", error=str(e))
         
         survey_doc = {
             "title": survey_data.get("title"),
+            "title_mr": survey_data.get("title_mr"),
+            "title_hi": survey_data.get("title_hi"),
             "fields": survey_data.get("fields", []),
             "assignedTo": survey_data.get("assignedTo", []),
             "createdBy": user["uid"],
             "publishedAt": firestore.SERVER_TIMESTAMP,
-            "status": "active"
+            "status": "active",
+            "connectedSurvey": survey_data.get("connectedSurvey"),
+            "linkMethod": survey_data.get("linkMethod"),
+            "hasLinkage": survey_data.get("hasLinkage", False),
+            "iconName": icon_name
         }
         
         # Create survey template
