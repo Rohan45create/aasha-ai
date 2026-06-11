@@ -1,3 +1,4 @@
+// TODO: Add view mode � same pattern as FamilySurvey.jsx
 import BaseModuleForm from '../../../components/BaseModuleForm';
 
 const VACCINE_OPTIONS = [
@@ -46,3 +47,4 @@ export default function Vaccination() {
     aadhaarPersonLabel="Child / बालक"
   />;
 }
+

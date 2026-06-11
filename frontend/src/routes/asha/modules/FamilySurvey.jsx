@@ -3,7 +3,7 @@ import AadhaarInput from '../../../components/AadhaarInput';
 import DuplicateWarningModal from '../../../components/DuplicateWarningModal';
 import { useAuthStore } from '../../../stores/authStore';
 import { addHousehold, addMember } from '../../../utils/firestore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import AmbientToggle from '../../../components/AmbientToggle';
 import VoiceOverlay from '../../../components/VoiceOverlay';
 
@@ -18,6 +18,13 @@ async function hashAadhaar(aadhaarString) {
 export default React.memo(function FamilySurvey() {
   const { ashaId, user } = useAuthStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const viewState = location.state;
+  const isViewMode = viewState?.mode === 'view' || searchParams.get('mode') === 'view';
+  const [isEditMode, setIsEditMode] = useState(false);
+  const submissionId = viewState?.submissionId || searchParams.get('submissionId');
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   const [household, setHousehold] = useState({
     house_number: '',
@@ -55,6 +62,46 @@ export default React.memo(function FamilySurvey() {
       voiceFilled: [], isDuplicate: false, existingId: null
     })));
   };
+
+  useEffect(() => {
+    if (viewState?.submissionData) {
+      const data = viewState.submissionData;
+      if (data.formData) {
+        if (data.formData.household) setHousehold(data.formData.household);
+        if (data.formData.members) {
+          setMembers(data.formData.members);
+          setMemberCount(data.formData.members.length);
+        }
+      }
+      setIsDataLoaded(true);
+    } else if (submissionId && !isDataLoaded) {
+      const loadSubmission = async () => {
+        setIsLoading(true);
+        try {
+          const { getDoc, doc } = await import('firebase/firestore');
+          const { db } = await import('../../../firebase');
+          const docSnap = await getDoc(doc(db, 'module_submissions', submissionId));
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.formData) {
+              if (data.formData.household) setHousehold(data.formData.household);
+              if (data.formData.members) {
+                setMembers(data.formData.members);
+                setMemberCount(data.formData.members.length);
+              }
+            }
+          }
+          setIsDataLoaded(true);
+        } catch (err) {
+          console.error(err);
+          showToast('Failed to load submission data', 'error');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      loadSubmission();
+    }
+  }, [submissionId, isDataLoaded, viewState]);
 
   const updateMember = (index, field, value) => {
     setMembers(prev => prev.map((m, i) => i === index ? { ...m, [field]: value } : m));
@@ -327,11 +374,29 @@ export default React.memo(function FamilySurvey() {
       )}
 
       <div className="flex items-center justify-between p-4 bg-white border-b sticky top-0 z-30 shadow-sm">
-        <h2 className="text-xl font-bold text-[#1A1A18]">Family Survey</h2>
-        <AmbientToggle module="family_survey" onAcceptSuggestion={() => {}} />
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-bold text-[#1A1A18]">Family Survey</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <AmbientToggle module="family_survey" onAcceptSuggestion={() => {}} />
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="px-4 mt-6 space-y-4">
+        {isViewMode && !isEditMode && (
+          <div style={{background:'#EAF3DE', padding:'10px 16px', borderRadius:8, marginBottom:12, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+            <span style={{fontSize:13, color:'#27500A'}}>Viewing submitted record</span>
+            <button
+              type="button"
+              onClick={() => setIsEditMode(true)}
+              style={{fontSize:13, color:'#1D9E75', background:'none', border:'none', cursor:'pointer', fontWeight:500}}
+            >
+              Edit ✏️
+            </button>
+          </div>
+        )}
+
+        <fieldset disabled={isViewMode && !isEditMode} className="space-y-4 border-none p-0 m-0">
         {members.map((member, index) => {
           const isExpanded = expandedMember === index;
           const complete = isMemberComplete(member);
@@ -355,9 +420,9 @@ export default React.memo(function FamilySurvey() {
                    <button type="button" onClick={() => removeMember(index)} className="w-8 h-8 rounded-full flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors">
                      <span className="text-2xl leading-none">&minus;</span>
                    </button>
-                   <button type="button" onClick={() => setExpandedMember(isExpanded ? -1 : index)} className="text-[#5F5E5A]">
+                   <div role="button" onClick={() => setExpandedMember(isExpanded ? -1 : index)} className="text-[#5F5E5A] cursor-pointer">
                      <span className="material-symbols-outlined">{isExpanded ? 'expand_less' : 'expand_more'}</span>
-                   </button>
+                   </div>
                 </div>
               </div>
 
@@ -451,31 +516,34 @@ export default React.memo(function FamilySurvey() {
         </button>
 
         <div className="h-8"></div>
+        </fieldset>
 
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-[#D3D1C7] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30">
-           <div className="flex flex-col space-y-2 max-w-lg mx-auto">
-             <div className="flex justify-between text-sm font-medium">
-                <span className="text-gray-600">Progress</span>
-                <span className={isAllComplete ? "text-[#1D9E75]" : "text-amber-500"}>{completeCount} of {members.length} members complete</span>
+        {(!isViewMode || isEditMode) && (
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-[#D3D1C7] shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-30">
+             <div className="flex flex-col space-y-2 max-w-lg mx-auto">
+               <div className="flex justify-between text-sm font-medium">
+                  <span className="text-gray-600">Progress</span>
+                  <span className={isAllComplete ? "text-[#1D9E75]" : "text-amber-500"}>{completeCount} of {members.length} members complete</span>
+               </div>
+               <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                     className={`h-full transition-all duration-500 ${isAllComplete ? 'bg-[#1D9E75]' : 'bg-amber-500'}`} 
+                     style={{ width: `${Math.round((completeCount / members.length) * 100)}%` }}
+                  ></div>
+               </div>
+               
+               <button 
+                  type="submit" 
+                  disabled={isLoading || !isAllComplete} 
+                  className={`w-full mt-3 py-4 rounded-xl font-bold shadow-md transition-all flex justify-center items-center gap-2 ${
+                    isAllComplete && !isLoading ? 'bg-[#1D9E75] text-white hover:bg-[#16815e] active:scale-95' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+               >
+                  {isLoading ? <span className="material-symbols-outlined animate-spin">refresh</span> : 'Save Survey & Confirm'}
+               </button>
              </div>
-             <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div 
-                   className={`h-full transition-all duration-500 ${isAllComplete ? 'bg-[#1D9E75]' : 'bg-amber-500'}`} 
-                   style={{ width: `${Math.round((completeCount / members.length) * 100)}%` }}
-                ></div>
-             </div>
-             
-             <button 
-                type="submit" 
-                disabled={isLoading || !isAllComplete} 
-                className={`w-full mt-3 py-4 rounded-xl font-bold shadow-md transition-all flex justify-center items-center gap-2 ${
-                  isAllComplete && !isLoading ? 'bg-[#1D9E75] text-white hover:bg-[#16815e] active:scale-95' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
-             >
-                {isLoading ? <span className="material-symbols-outlined animate-spin">refresh</span> : 'Save Survey & Confirm'}
-             </button>
-           </div>
-        </div>
+          </div>
+        )}
       </form>
       
       <button

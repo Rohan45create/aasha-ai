@@ -26,6 +26,9 @@ export default function SurveyBuilder() {
   const [publishing, setPublishing] = useState(false);
   const [translating, setTranslating] = useState(null); // identifier of what is being translated
   const { user, headId } = useAuthStore();
+  
+  const [connectedSurvey, setConnectedSurvey] = useState('');
+  const [linkMethod, setLinkMethod] = useState('');
 
   const addField = (type) => {
     const defaults = {
@@ -135,7 +138,10 @@ export default function SurveyBuilder() {
           fields, 
           headId, 
           assignedTo: 'all', 
-          createdBy: user?.uid 
+          createdBy: user?.uid,
+          connectedSurvey: connectedSurvey || null,
+          linkMethod: linkMethod || null,
+          hasLinkage: connectedSurvey !== '' && connectedSurvey !== null
         })
       });
       if (response.ok) {
@@ -145,6 +151,8 @@ export default function SurveyBuilder() {
         setTitleHI('');
         setFields([]);
         setExpandedField(null);
+        setConnectedSurvey('');
+        setLinkMethod('');
       } else {
         const err = await response.json().catch(() => ({}));
         alert(`Failed: ${err.detail || response.status}`);
@@ -243,6 +251,65 @@ export default function SurveyBuilder() {
               <label className="text-xs text-[#5F5E5A] font-bold uppercase w-16">Hindi</label>
               <input value={titleHI} onChange={e => setTitleHI(e.target.value)} className="flex-1 p-2 border border-[#D3D1C7] rounded-lg text-sm focus:outline-none focus:border-[#1D9E75]" placeholder="सर्वेक्षण शीर्षक..." />
             </div>
+          </div>
+        </div>
+
+        {/* Cross-Survey Linkage Section */}
+        <div className="mb-6 border border-[#D3D1C7] rounded-xl p-4 bg-[#F5F4EF]">
+          <h3 className="text-sm font-bold text-[#085041] mb-3">Cross-Survey Linkage (Optional)</h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-[#5F5E5A] mb-1">Connect records from this survey to:</label>
+              <select 
+                value={connectedSurvey} 
+                onChange={(e) => {
+                  setConnectedSurvey(e.target.value);
+                  if (!e.target.value) setLinkMethod('');
+                }}
+                className="w-full max-w-sm p-2 border border-[#D3D1C7] rounded-lg text-sm focus:outline-none focus:border-[#1D9E75]"
+              >
+                <option value="">None (default)</option>
+                <option value="family_survey">Family Survey</option>
+                <option value="child_growth">Child Growth</option>
+                <option value="anc">ANC Registration</option>
+                <option value="vaccination">Vaccination</option>
+                <option value="village_health">Village Health</option>
+              </select>
+            </div>
+
+            {connectedSurvey && (
+              <div className="pl-4 border-l-2 border-[#1D9E75] space-y-2">
+                <label className="block text-xs font-bold text-[#5F5E5A]">Link by:</label>
+                <div className="flex items-center gap-4 text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="linkMethod" 
+                      value="aadhaar" 
+                      checked={linkMethod === 'aadhaar'}
+                      onChange={(e) => setLinkMethod(e.target.value)}
+                      className="text-[#1D9E75] focus:ring-[#1D9E75]"
+                    />
+                    Aadhaar Number
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="linkMethod" 
+                      value="name_dob" 
+                      checked={linkMethod === 'name_dob'}
+                      onChange={(e) => setLinkMethod(e.target.value)}
+                      className="text-[#1D9E75] focus:ring-[#1D9E75]"
+                    />
+                    Name + Date of Birth
+                  </label>
+                </div>
+                <p className="text-[10px] text-[#5F5E5A] max-w-md mt-2">
+                  When this survey is submitted, AshaAI will attempt to automatically link each record to the selected survey using the chosen identifier.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

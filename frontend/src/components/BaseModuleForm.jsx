@@ -1,21 +1,113 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDoc, doc, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { useAuthStore } from '../stores/authStore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import VoiceOverlay from './VoiceOverlay';
 import AmbientToggle from './AmbientToggle';
 import AadhaarAutofill from './AadhaarAutofill';
 import { useTx } from '../context/TranslationContext';
 
-export default function BaseModuleForm({ title, moduleIcon, collectionName, fields, moduleName, onSubmit, onFormChange, showAadhaar = true, aadhaarPersonLabel = '' }) {
+export default function BaseModuleForm({ title, moduleIcon, collectionName, fields, moduleName, onSubmit, onFormChange, showAadhaar = true, aadhaarPersonLabel = '', extraData = {}, onAadhaarScanned, afterSubmit }) {
   const { user, ashaId: storeAshaId } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const viewState = location.state;
+  const isViewMode = viewState?.mode === 'view';
   const tx = useTx();
-  const [formData, setFormData] = useState({});
+  
+  const [formData, setFormData] = useState(() => {
+    if (isViewMode && viewState?.submissionData) {
+      return viewState.submissionData;
+    }
+    return {};
+  });
+  
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    if (isViewMode && viewState?.submissionId) {
+      const fetchFullRecord = async () => {
+        setIsLoading(true);
+        try {
+          const recordId = viewState.submissionData?.recordId || viewState.submissionData?.originalId || viewState.submissionData?.documentId || viewState.submissionId;
+          const docSnap = await getDoc(doc(db, collectionName, recordId));
+          
+          if (docSnap.exists()) {
+            setFormData(docSnap.data());
+          } else {
+            // Fallback 1: Try to find the record by ASHA ID and proximity in time without using orderBy (which requires an index)
+            const ashaIdToUse = viewState.submissionData?.ashaId || storeAshaId || localStorage.getItem('ashaId') || user?.uid;
+            if (ashaIdToUse) {
+              const q = query(
+                collection(db, collectionName), 
+                where('ashaId', '==', ashaIdToUse)
+              );
+              const fallbackSnaps = await getDocs(q);
+              
+              if (!fallbackSnaps.empty) {
+                let closestDoc = null;
+                
+                // Try to find the original submittedAt. It might be in submissionData or we might not have it.
+                const submittedAt = viewState.submissionData?.submittedAt || viewState.rawSubmission?.submittedAt;
+                if (submittedAt) {
+                  const targetTime = submittedAt?.toMillis ? submittedAt.toMillis() : Date.parse(submittedAt);
+                  let minDiff = Infinity;
+                  
+                  fallbackSnaps.forEach(d => {
+                    const dData = d.data();
+                    if (dData.createdAt) {
+                      const docTime = dData.createdAt?.toMillis ? dData.createdAt.toMillis() : Date.parse(dData.createdAt);
+                      const diff = Math.abs(docTime - targetTime);
+                      if (diff < minDiff) {
+                        minDiff = diff;
+                        closestDoc = dData;
+                      }
+                    }
+                  });
+                  
+                  if (closestDoc && minDiff < 1000 * 60 * 5) { // within 5 minutes
+                    setFormData(closestDoc);
+                    return;
+                  }
+                }
+                
+                // If we couldn't match time exactly or it fell outside 5 minutes, find the newest one manually
+                let newestDoc = null;
+                let maxTime = -1;
+                fallbackSnaps.forEach(d => {
+                  const dData = d.data();
+                  const docTime = dData.createdAt?.toMillis ? dData.createdAt.toMillis() : (Date.parse(dData.createdAt) || 0);
+                  if (docTime > maxTime) {
+                    maxTime = docTime;
+                    newestDoc = dData;
+                  }
+                });
+                
+                setFormData(newestDoc || fallbackSnaps.docs[0].data());
+                return;
+              }
+            }
+            
+            // Fallback 2: The payload might be right there in the state
+            if (viewState.submissionData?.formData) {
+              setFormData(viewState.submissionData.formData);
+            } else {
+              setFormData(viewState.submissionData || {});
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching full record:", err);
+          setFormData(viewState.submissionData?.formData || viewState.submissionData || {});
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchFullRecord();
+    }
+  }, [isViewMode, viewState, collectionName]);
 
   // Voice integration
   const voiceModule = moduleName || collectionName || 'family_survey';
@@ -47,7 +139,10 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
   };
 
   // Aadhaar autofill handler
-  const handleAadhaarAutofill = (payload) => {
+  const handleAadhaarAutofill = (payload, rawAadhaar) => {
+    if (onAadhaarScanned && rawAadhaar) {
+      onAadhaarScanned(rawAadhaar.slice(-4));
+    }
     if (!payload || typeof payload !== 'object') return;
     const filledKeys = [];
     setFormData(prev => {
@@ -92,6 +187,7 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
       } else {
         const docRef = await addDoc(collection(db, collectionName), {
           ...formData,
+          ...extraData,
           ashaId: resolvedAshaId,
           source: 'manual',
           createdAt: serverTimestamp(),
@@ -106,6 +202,9 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
           ashaId: resolvedAshaId,
           timestamp: serverTimestamp(),
         });
+        if (afterSubmit) {
+          await afterSubmit(docRef.id, formData);
+        }
       }
       showToast(tx('Record saved successfully!', 'record_saved'), 'success');
       setTimeout(() => navigate(-1), 800);
@@ -166,8 +265,15 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {isViewMode && (
+          <div style={{background:'#EAF3DE', padding:'10px 16px', borderRadius:8, marginBottom:12, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+            <span style={{fontSize:13, color:'#27500A', fontWeight:500}}>{tx('Viewing submitted record')}</span>
+          </div>
+        )}
+        <fieldset disabled={isViewMode} className="space-y-4 border-none p-0 m-0">
+        
         {/* Aadhaar Autofill — shown at top of every form */}
-        {showAadhaar && (
+        {showAadhaar && !isViewMode && (
           <AadhaarAutofill
             moduleName={moduleName || 'default'}
             personLabel={aadhaarPersonLabel}
@@ -236,30 +342,35 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
         ))}
 
         {/* Action buttons */}
-        <div className="pt-4 space-y-3">
-          {/* Submit + Cancel */}
-          <div className="flex space-x-3">
-            <button type="button" onClick={() => navigate(-1)} className="flex-1 py-3 border border-[#D3D1C7] text-[#5F5E5A] rounded-xl font-medium text-center hover:bg-gray-50 flex justify-center items-center">
-              {tx('Cancel', 'cancel')}
-            </button>
-            <button type="submit" disabled={isLoading} className="flex-1 py-3 bg-[#1D9E75] text-white rounded-xl font-medium text-center shadow-md active:scale-[0.98] flex justify-center items-center">
-              {isLoading ? <span className="material-symbols-outlined animate-spin">refresh</span> : tx('Save Record', 'save_record')}
-            </button>
+        {!isViewMode && (
+          <div className="pt-4 space-y-3">
+            {/* Submit + Cancel */}
+            <div className="flex space-x-3">
+              <button type="button" onClick={() => navigate(-1)} className="flex-1 py-3 border border-[#D3D1C7] text-[#5F5E5A] rounded-xl font-medium text-center hover:bg-gray-50 flex justify-center items-center">
+                {tx('Cancel', 'cancel')}
+              </button>
+              <button type="submit" disabled={isLoading} className="flex-1 py-3 bg-[#1D9E75] text-white rounded-xl font-medium text-center shadow-md active:scale-[0.98] flex justify-center items-center">
+                {isLoading ? <span className="material-symbols-outlined animate-spin">refresh</span> : tx('Save Record', 'save_record')}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+        </fieldset>
       </form>
 
       {/* Floating Voice Mic Button */}
-      <button
-        type="button"
-        onClick={() => setShowVoice(true)}
-        style={{ position: 'fixed', bottom: '80px', right: '20px' }}
-        className="w-[72px] h-[72px] bg-[#1D9E75] text-white rounded-full flex items-center justify-center shadow-lg z-40 hover:scale-105 transition-transform"
-      >
-        <span className="material-symbols-outlined text-4xl">mic</span>
-      </button>
+      {!isViewMode && (
+        <button
+          type="button"
+          onClick={() => setShowVoice(true)}
+          style={{ position: 'fixed', bottom: '80px', right: '20px' }}
+          className="w-[72px] h-[72px] bg-[#1D9E75] text-white rounded-full flex items-center justify-center shadow-lg z-40 hover:scale-105 transition-transform"
+        >
+          <span className="material-symbols-outlined text-4xl">mic</span>
+        </button>
+      )}
 
-      {showVoice && (
+      {showVoice && !isViewMode && (
         <VoiceOverlay 
           moduleType={voiceModule} 
           formFields={fields}

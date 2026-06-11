@@ -1,3 +1,4 @@
+// TODO: Add view mode � same pattern as FamilySurvey.jsx
 import BaseModuleForm from '../../../components/BaseModuleForm';
 
 const FIELDS = [
@@ -40,3 +41,4 @@ export default function BirthRecord() {
     aadhaarPersonLabel="Mother / आई"
   />;
 }
+

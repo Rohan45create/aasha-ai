@@ -1,8 +1,14 @@
+// TODO: Add view mode � same pattern as FamilySurvey.jsx
 import { useState, useRef } from 'react';
 import BaseModuleForm from '../../../components/BaseModuleForm';
 import { useAuthStore } from '../../../stores/authStore';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../../firebase';
+import AmbientToggle from '../../../components/AmbientToggle';
+import AadhaarAutofill from '../../../components/AadhaarAutofill';
+import { useTranslation } from 'react-i18next';
+import AadhaarLinkagePopup from '../../../components/AadhaarLinkagePopup';
+import { apiFetch } from '../../../utils/api';
 
 const FIELDS = [
   { id: 'child_name', label: 'Child Name / बालकाचे नाव', required: true, placeholder: 'Full name' },
@@ -73,8 +79,64 @@ export default function ChildGrowth() {
   const [gradeResult, setGradeResult] = useState(null);
   const [prefillData, setPrefillData] = useState(null);
   const [referralSent, setReferralSent] = useState(false);
+  const [hasParents, setHasParents] = useState(true);
+  const [showLinkagePopup, setShowLinkagePopup] = useState(false);
+  const [linkageData, setLinkageData] = useState(null);
+  const [linkageConfirmedData, setLinkageConfirmedData] = useState(null);
+  
   const fileInputRef = useRef();
   const { user } = useAuthStore();
+
+  const handleAmbientSuggestion = (suggestion) => {
+    if (suggestion?.field && suggestion?.value !== undefined) {
+      setFormData(prev => ({ ...prev, [suggestion.field]: suggestion.value }));
+    }
+  };
+
+  const handleAadhaarEntered = async (last4) => {
+    if (!hasParents) return; // skip if orphan
+
+    try {
+      const result = await apiFetch('/api/members/check-linkage', {
+        method: 'POST',
+        body: JSON.stringify({ aadhaar_last4: last4, module_type: 'child_growth' })
+      });
+      if (result.match_found) {
+        setLinkageData(result);
+        setShowLinkagePopup(true);
+      }
+    } catch (err) {
+      console.log('Linkage check skipped (offline or error)', err);
+    }
+  };
+
+  const handleConfirmLinkage = () => {
+    setShowLinkagePopup(false);
+    setLinkageConfirmedData(linkageData);
+  };
+
+  const handleRejectLinkage = () => {
+    setShowLinkagePopup(false);
+    setLinkageConfirmedData(null);
+  };
+
+  const handleAfterSubmit = async (docId) => {
+    if (linkageConfirmedData && hasParents) {
+      try {
+        await apiFetch('/api/members/confirm-linkage', {
+          method: 'POST',
+          body: JSON.stringify({
+            record_collection: 'children',
+            record_id: docId,
+            household_id: linkageConfirmedData.household_id,
+            member_id: linkageConfirmedData.member_id
+          })
+        });
+      } catch (err) {
+        console.error('Linkage confirmation failed', err);
+      }
+    }
+  };
 
   const handleCapture = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -334,6 +396,36 @@ export default function ChildGrowth() {
         <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleCapture} className="hidden" />
       </div>
 
+      {/* ── Orphan Toggle ── */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#D3D1C7]">
+        <label className="block text-sm font-medium mb-3 text-[#5F5E5A]">
+          Does this child have parents or a guardian?
+        </label>
+        <div className="flex bg-gray-100 p-1 rounded-xl w-max mb-3">
+          <button 
+            type="button" 
+            onClick={() => setHasParents(true)} 
+            className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${hasParents ? 'bg-white shadow text-[#1A1A18]' : 'text-[#5F5E5A]'}`}>
+            Yes
+          </button>
+          <button 
+            type="button" 
+            onClick={() => setHasParents(false)} 
+            className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${!hasParents ? 'bg-white shadow text-[#1A1A18]' : 'text-[#5F5E5A]'}`}>
+            No
+          </button>
+        </div>
+        
+        {!hasParents && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start gap-2">
+            <span className="material-symbols-outlined text-blue-600 text-lg mt-0.5">info</span>
+            <p className="text-sm text-blue-800 font-medium">
+              This child will be registered as an independent record. No family linkage required.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* ── Regular Form ── */}
       <BaseModuleForm
         title="Child Growth / बाल वाढ"
@@ -342,8 +434,27 @@ export default function ChildGrowth() {
         moduleName="child_growth"
         fields={FIELDS}
         onFormChange={setPrefillData}
+        showAadhaar={hasParents}
         aadhaarPersonLabel="Child / बालक"
+        onAadhaarScanned={handleAadhaarEntered}
+        afterSubmit={handleAfterSubmit}
+        extraData={{
+          isOrphan: !hasParents,
+          hasParents: hasParents,
+          ...( !hasParents ? { familyLinkageSkipped: true } : {} )
+        }}
+      />
+
+      <AadhaarLinkagePopup
+        isOpen={showLinkagePopup}
+        memberName={linkageData?.member_name}
+        familyHeadName={linkageData?.family_head}
+        moduleType="Child Growth"
+        onConfirm={handleConfirmLinkage}
+        onReject={handleRejectLinkage}
+        onClose={handleRejectLinkage}
       />
     </div>
   );
 }
+

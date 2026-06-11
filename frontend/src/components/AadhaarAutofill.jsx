@@ -20,14 +20,14 @@ const MODULE_FIELD_MAP = {
     name:        'mother_name',
     dob:         null,
     gender:      null,
-    aadhaar_raw: null,
+    aadhaar_raw: 'aadhaar_number',
   },
   // Child Growth — child name + gender
   child_growth: {
     name:        'child_name',
     gender:      'gender',
     dob:         null,
-    aadhaar_raw: null,
+    aadhaar_raw: 'aadhaar_number',
   },
   // Vaccination — child name + DOB
   vaccination: {
@@ -96,6 +96,13 @@ const MODULE_FIELD_MAP = {
     name:        'member_name',
     gender:      'gender',
     dob:         'date_of_birth',
+    aadhaar_raw: 'aadhaar_number',
+  },
+  // Dynamic Surveys
+  dynamic: {
+    name:        null,
+    gender:      null,
+    dob:         null,
     aadhaar_raw: 'aadhaar_number',
   },
 };
@@ -257,8 +264,8 @@ export default function AadhaarAutofill({ moduleName = 'default', personLabel = 
     setMasked(`XXXX-XXXX-XXXX-${last4}`);
     setFilled(labels);
     setMode('confirmed');
-    if (Object.keys(payload).length > 0) {
-      onAutofill(payload);
+    if (Object.keys(payload).length > 0 || extracted.aadhaar_raw) {
+      onAutofill(payload, extracted.aadhaar_raw);
     }
   };
 
