@@ -30,6 +30,7 @@ const FamilyPlanning = lazy(() => import('./routes/asha/modules/FamilyPlanning.j
 const Sanitation = lazy(() => import('./routes/asha/modules/Sanitation.jsx'));
 const ElderlyCare = lazy(() => import('./routes/asha/modules/ElderlyCare.jsx'));
 const DynamicSurvey = lazy(() => import('./routes/asha/modules/DynamicSurvey.jsx'));
+const AppointmentsList = lazy(() => import('./routes/asha/AppointmentsList.jsx'));
 
 // Admin Routes
 const AdminDashboard = lazy(() => import('./routes/admin/Dashboard.jsx'));
@@ -132,6 +133,7 @@ const App = () => {
             <Route path="/asha/sanitation" element={<Sanitation />} />
             <Route path="/asha/elderly-care" element={<ElderlyCare />} />
             <Route path="/asha/dynamic-survey" element={<DynamicSurvey />} />
+            <Route path="/asha/appointments" element={<AppointmentsList />} />
           </Route>
 
           {/* Admin Protected Routes */}

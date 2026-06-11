@@ -12,7 +12,7 @@ from services.redis_service import init_redis, close_redis, ping as redis_ping
 
 # Import routers
 from routers.modules import family_survey
-from routers import risk, voice, admin, vision, ambient, security, register, members, chat, translate
+from routers import risk, voice, admin, vision, ambient, security, register, members, chat, translate, appointments
 
 # Initialize External Services
 initialize_firebase()
@@ -47,7 +47,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174").split(","),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT"],  # No DELETE — data is permanent
+    allow_methods=["GET", "POST", "PUT", "PATCH"],  # No DELETE — data is permanent
     allow_headers=["Authorization", "Content-Type"],
 )
 app.add_middleware(LoggingMiddleware)
@@ -62,6 +62,7 @@ app.include_router(register.router, dependencies=[Depends(verify_firebase_token)
 app.include_router(members.router, dependencies=[Depends(verify_firebase_token)])
 app.include_router(chat.router, dependencies=[Depends(verify_firebase_token)])
 app.include_router(translate.router, dependencies=[Depends(verify_firebase_token)])
+app.include_router(appointments.router, dependencies=[Depends(verify_firebase_token)])
 
 
 # Ambient AI WebSocket — authenticates internally via query param
