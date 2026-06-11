@@ -1,4 +1,4 @@
-// TODO: Add view mode � same pattern as FamilySurvey.jsx
+// TODO: Add view mode — same pattern as FamilySurvey.jsx
 import BaseModuleForm from '../../../components/BaseModuleForm';
 
 const VACCINE_OPTIONS = [
@@ -39,12 +39,12 @@ const FIELDS = [
 
 export default function Vaccination() {
   return <BaseModuleForm 
-    title="Vaccination / लसीकरण" 
+    title="Vaccination / à¤²à¤¸à¥€à¤•à¤°à¤£" 
     moduleIcon="vaccines" 
     collectionName="vaccinations"
     moduleName="vaccination"
     fields={FIELDS}
-    aadhaarPersonLabel="Child / बालक"
+    aadhaarPersonLabel="Child / à¤¬à¤¾à¤²à¤•"
   />;
 }
-
+

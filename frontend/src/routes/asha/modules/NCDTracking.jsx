@@ -1,4 +1,4 @@
-// TODO: Add view mode � same pattern as FamilySurvey.jsx
+// TODO: Add view mode — same pattern as FamilySurvey.jsx
 import React from 'react';
 import BaseModuleForm from '../../../components/BaseModuleForm';
 
@@ -26,8 +26,8 @@ export default function NCDTracking() {
       collectionName="ncd_screenings"
       moduleName="ncd_tracking"
       fields={fields}
-      aadhaarPersonLabel="Patient / रुग्ण"
+      aadhaarPersonLabel="Patient / à¤°à¥�à¤—à¥�à¤£"
     />
   );
 }
-
+

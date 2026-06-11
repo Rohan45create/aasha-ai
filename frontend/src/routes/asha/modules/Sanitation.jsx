@@ -1,4 +1,4 @@
-// TODO: Add view mode � same pattern as FamilySurvey.jsx
+// TODO: Add view mode — same pattern as FamilySurvey.jsx
 import React from 'react';
 import BaseModuleForm from '../../../components/BaseModuleForm';
 
@@ -39,8 +39,8 @@ export default function Sanitation() {
       collectionName="sanitation_surveys"
       moduleName="sanitation"
       fields={fields}
-      aadhaarPersonLabel="Household Head / कुटुंब प्रमुख"
+      aadhaarPersonLabel="Household Head / à¤•à¥�à¤Ÿà¥�à¤‚à¤¬ à¤ªà¥�à¤°à¤®à¥�à¤–"
     />
   );
 }
-
+

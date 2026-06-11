@@ -1,4 +1,4 @@
-// TODO: Add view mode � same pattern as FamilySurvey.jsx
+// TODO: Add view mode — same pattern as FamilySurvey.jsx
 import { useState, useRef } from 'react';
 import BaseModuleForm from '../../../components/BaseModuleForm';
 import { useAuthStore } from '../../../stores/authStore';
@@ -11,19 +11,19 @@ import AadhaarLinkagePopup from '../../../components/AadhaarLinkagePopup';
 import { apiFetch } from '../../../utils/api';
 
 const FIELDS = [
-  { id: 'child_name', label: 'Child Name / बालकाचे नाव', required: true, placeholder: 'Full name' },
+  { id: 'child_name', label: 'Child Name / à¤¬à¤¾à¤²à¤•à¤¾à¤šà¥‡ à¤¨à¤¾à¤µ', required: true, placeholder: 'Full name' },
   { id: 'mother_name', label: 'Mother Name', required: true },
   { id: 'age_months', label: 'Age (months)', type: 'number', required: true, placeholder: '0-60' },
   { id: 'gender', label: 'Gender', type: 'select', required: true, options: [
-    { value: 'Male', label: 'Male / मुलगा' }, { value: 'Female', label: 'Female / मुलगी' }
+    { value: 'Male', label: 'Male / à¤®à¥�à¤²à¤—à¤¾' }, { value: 'Female', label: 'Female / à¤®à¥�à¤²à¤—à¥€' }
   ]},
   { id: 'weight_kg', label: 'Weight (kg)', type: 'number', required: true, placeholder: 'e.g. 8.5' },
   { id: 'height_cm', label: 'Height (cm)', type: 'number', required: true, placeholder: 'e.g. 72' },
   { id: 'muac_cm', label: 'MUAC (cm)', type: 'number', placeholder: 'e.g. 13.5' },
   { id: 'muac_color', label: 'MUAC Color Zone', type: 'select', options: [
-    { value: 'GREEN', label: 'Green (≥13.5cm — Normal)' },
-    { value: 'YELLOW', label: 'Yellow (12.5-13.4cm — MAM)' },
-    { value: 'RED', label: 'Red (<12.5cm — SAM)' }
+    { value: 'GREEN', label: 'Green (â‰¥13.5cm â€” Normal)' },
+    { value: 'YELLOW', label: 'Yellow (12.5-13.4cm â€” MAM)' },
+    { value: 'RED', label: 'Red (<12.5cm â€” SAM)' }
   ]},
   { id: 'malnutritionGrade', label: 'AI Visual Malnutrition Grade', type: 'select', options: [
     { value: 'NORMAL', label: 'Normal' },
@@ -202,13 +202,13 @@ export default function ChildGrowth() {
         status: 'Pending',
         referredDate: new Date().toISOString().split('T')[0],
         nrcName: null,
-        reason: `Severe Acute Malnutrition (SAM) — AI Visual Scan (${gradeResult?.confidence ?? '?'}% confidence)`,
+        reason: `Severe Acute Malnutrition (SAM) â€” AI Visual Scan (${gradeResult?.confidence ?? '?'}% confidence)`,
         village: prefillData?.village || null,
         createdAt: serverTimestamp(),
       });
 
       await addDoc(collection(db, 'pending_reviews'), {
-        title: `SAM: ${childName} — Immediate NRC referral`,
+        title: `SAM: ${childName} â€” Immediate NRC referral`,
         ashaId: user.uid,
         linkedCollection: 'children',
         linkedDocId: childId,
@@ -236,7 +236,7 @@ export default function ChildGrowth() {
 
   return (
     <div className="space-y-4">
-      {/* ── AI Malnutrition Scan Card ── */}
+      {/* â”€â”€ AI Malnutrition Scan Card â”€â”€ */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#D3D1C7] space-y-4">
         <div className="flex items-center space-x-3 mb-2">
           <div className="w-10 h-10 bg-[#FCEBEB] rounded-full flex items-center justify-center text-[#791F1F]">
@@ -244,11 +244,11 @@ export default function ChildGrowth() {
           </div>
           <div>
             <h3 className="font-bold text-[#1A1A18]">AI Malnutrition Scan</h3>
-            <p className="text-xs text-[#5F5E5A]">Take a photo of the child — Gemini will assess malnutrition risk</p>
+            <p className="text-xs text-[#5F5E5A]">Take a photo of the child â€” Gemini will assess malnutrition risk</p>
           </div>
         </div>
 
-        {/* ── Result State ── */}
+        {/* â”€â”€ Result State â”€â”€ */}
         {gradeResult ? (
           <div>
             {gradeResult.error ? (
@@ -318,7 +318,7 @@ export default function ChildGrowth() {
                     {referralSent ? (
                       <div style={{ background: '#085041', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span className="material-symbols-outlined" style={{ color: '#fff', fontSize: '20px' }}>check_circle</span>
-                        <p style={{ color: '#fff', fontWeight: '700', fontSize: '14px' }}>NRC Referral Sent — Admin Notified</p>
+                        <p style={{ color: '#fff', fontWeight: '700', fontSize: '14px' }}>NRC Referral Sent â€” Admin Notified</p>
                       </div>
                     ) : (
                       <button
@@ -340,7 +340,7 @@ export default function ChildGrowth() {
             )}
           </div>
         ) : preview ? (
-          /* ── Preview State ── */
+          /* â”€â”€ Preview State â”€â”€ */
           <div>
             <div style={{ position: 'relative' }}>
               <img src={preview} alt="Child" style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '14px', border: '1px solid #D3D1C7' }} />
@@ -364,7 +364,7 @@ export default function ChildGrowth() {
               {loading ? (
                 <>
                   <span className="material-symbols-outlined" style={{ fontSize: '20px', animation: 'spin 1s linear infinite' }}>refresh</span>
-                  Analyzing with AI…
+                  Analyzing with AIâ€¦
                 </>
               ) : (
                 <>
@@ -376,7 +376,7 @@ export default function ChildGrowth() {
             <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
           </div>
         ) : (
-          /* ── Upload State ── */
+          /* â”€â”€ Upload State â”€â”€ */
           <div
             onClick={() => fileInputRef.current.click()}
             style={{
@@ -396,7 +396,7 @@ export default function ChildGrowth() {
         <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleCapture} className="hidden" />
       </div>
 
-      {/* ── Orphan Toggle ── */}
+      {/* â”€â”€ Orphan Toggle â”€â”€ */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#D3D1C7]">
         <label className="block text-sm font-medium mb-3 text-[#5F5E5A]">
           Does this child have parents or a guardian?
@@ -426,16 +426,16 @@ export default function ChildGrowth() {
         )}
       </div>
 
-      {/* ── Regular Form ── */}
+      {/* â”€â”€ Regular Form â”€â”€ */}
       <BaseModuleForm
-        title="Child Growth / बाल वाढ"
+        title="Child Growth / à¤¬à¤¾à¤² à¤µà¤¾à¤¢"
         moduleIcon="child_care"
         collectionName="children"
         moduleName="child_growth"
         fields={FIELDS}
         onFormChange={setPrefillData}
         showAadhaar={hasParents}
-        aadhaarPersonLabel="Child / बालक"
+        aadhaarPersonLabel="Child / à¤¬à¤¾à¤²à¤•"
         onAadhaarScanned={handleAadhaarEntered}
         afterSubmit={handleAfterSubmit}
         extraData={{
@@ -457,4 +457,4 @@ export default function ChildGrowth() {
     </div>
   );
 }
-
+

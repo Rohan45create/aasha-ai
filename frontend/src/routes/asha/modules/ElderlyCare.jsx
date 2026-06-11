@@ -1,4 +1,4 @@
-// TODO: Add view mode � same pattern as FamilySurvey.jsx
+// TODO: Add view mode — same pattern as FamilySurvey.jsx
 import React from 'react';
 import BaseModuleForm from '../../../components/BaseModuleForm';
 
@@ -28,8 +28,8 @@ export default function ElderlyCare() {
       collectionName="elderly_care"
       moduleName="elderly_care"
       fields={fields}
-      aadhaarPersonLabel="Elderly Person / वृद्ध"
+      aadhaarPersonLabel="Elderly Person / à¤µà¥ƒà¤¦à¥�à¤§"
     />
   );
 }
-
+

@@ -1,4 +1,4 @@
-// TODO: Add view mode — same pattern as FamilySurvey.jsx
+// TODO: Add view mode â€” same pattern as FamilySurvey.jsx
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { db } from '../../../firebase';
@@ -141,4 +141,4 @@ export default function DynamicSurvey() {
     </>
   );
 }
-
+

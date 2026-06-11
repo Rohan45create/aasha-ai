@@ -1,8 +1,8 @@
-// TODO: Add view mode � same pattern as FamilySurvey.jsx
+// TODO: Add view mode — same pattern as FamilySurvey.jsx
 import BaseModuleForm from '../../../components/BaseModuleForm';
 
 const FIELDS = [
-  { id: 'village_name', label: 'Village Name / गावाचे नाव', required: true },
+  { id: 'village_name', label: 'Village Name / à¤—à¤¾à¤µà¤¾à¤šà¥‡ à¤¨à¤¾à¤µ', required: true },
   { id: 'survey_date', label: 'Survey Date', type: 'date', required: true },
   { id: 'total_population', label: 'Total Population', type: 'number', required: true, placeholder: 'Approx population' },
   { id: 'total_households', label: 'Total Households', type: 'number', required: true },
@@ -26,7 +26,7 @@ const FIELDS = [
 
 export default function VillageHealth() {
   return <BaseModuleForm 
-    title="Village Health / ग्राम आरोग्य" 
+    title="Village Health / à¤—à¥�à¤°à¤¾à¤® à¤†à¤°à¥‹à¤—à¥�à¤¯" 
     moduleIcon="holiday_village" 
     collectionName="village_health"
     moduleName="village_health"
@@ -34,4 +34,4 @@ export default function VillageHealth() {
     showAadhaar={false}
   />;
 }
-
+

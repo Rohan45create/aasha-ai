@@ -1,4 +1,4 @@
-// TODO: Add view mode � same pattern as FamilySurvey.jsx
+// TODO: Add view mode — same pattern as FamilySurvey.jsx
 import React from 'react';
 import BaseModuleForm from '../../../components/BaseModuleForm';
 
@@ -32,8 +32,8 @@ export default function FamilyPlanning() {
       collectionName="family_planning"
       moduleName="family_planning"
       fields={fields}
-      aadhaarPersonLabel="Beneficiary / लाभार्थी"
+      aadhaarPersonLabel="Beneficiary / à¤²à¤¾à¤­à¤¾à¤°à¥�à¤¥à¥€"
     />
   );
 }
-
+

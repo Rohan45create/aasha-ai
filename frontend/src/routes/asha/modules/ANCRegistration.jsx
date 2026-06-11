@@ -1,15 +1,15 @@
-// TODO: Add view mode � same pattern as FamilySurvey.jsx
+// TODO: Add view mode — same pattern as FamilySurvey.jsx
 import { useState } from 'react';
 import BaseModuleForm from '../../../components/BaseModuleForm';
 import AadhaarLinkagePopup from '../../../components/AadhaarLinkagePopup';
 import { apiFetch } from '../../../utils/api';
 
 const FIELDS = [
-  { id: 'mother_name', label: 'Pregnant Woman Name / गर्भवती नाव', required: true, placeholder: 'Full name' },
-  { id: 'husband_name', label: 'Husband Name / पतीचे नाव', required: true, placeholder: 'Full name' },
+  { id: 'mother_name', label: 'Pregnant Woman Name / à¤—à¤°à¥�à¤­à¤µà¤¤à¥€ à¤¨à¤¾à¤µ', required: true, placeholder: 'Full name' },
+  { id: 'husband_name', label: 'Husband Name / à¤ªà¤¤à¥€à¤šà¥‡ à¤¨à¤¾à¤µ', required: true, placeholder: 'Full name' },
   { id: 'age', label: 'Age (years)', type: 'number', required: true },
-  { id: 'lmp_date', label: 'LMP Date / शेवटची मासिक पाळी', type: 'date', required: true },
-  { id: 'edd_date', label: 'Expected Delivery Date / अपेक्षित तारीख', type: 'date' },
+  { id: 'lmp_date', label: 'LMP Date / à¤¶à¥‡à¤µà¤Ÿà¤šà¥€ à¤®à¤¾à¤¸à¤¿à¤• à¤ªà¤¾à¤³à¥€', type: 'date', required: true },
+  { id: 'edd_date', label: 'Expected Delivery Date / à¤…à¤ªà¥‡à¤•à¥�à¤·à¤¿à¤¤ à¤¤à¤¾à¤°à¥€à¤–', type: 'date' },
   { id: 'registration_date', label: 'Registration Date', type: 'date', required: true },
   { id: 'gravida', label: 'Gravida (Total Pregnancies)', type: 'number', placeholder: '1' },
   { id: 'para', label: 'Para (Deliveries)', type: 'number', placeholder: '0' },
@@ -79,12 +79,12 @@ export default function ANCRegistration() {
   return (
     <>
       <BaseModuleForm 
-        title="ANC Registration / गर्भवती नोंदणी" 
+        title="ANC Registration / à¤—à¤°à¥�à¤­à¤µà¤¤à¥€ à¤¨à¥‹à¤‚à¤¦à¤£à¥€" 
         moduleIcon="pregnant_woman" 
         collectionName="pregnancies"
         moduleName="anc"
         fields={FIELDS}
-        aadhaarPersonLabel="Mother / गर्भवती"
+        aadhaarPersonLabel="Mother / à¤—à¤°à¥�à¤­à¤µà¤¤à¥€"
         onAadhaarScanned={handleAadhaarEntered}
         afterSubmit={handleAfterSubmit}
       />
@@ -100,4 +100,4 @@ export default function ANCRegistration() {
     </>
   );
 }
-
+

@@ -1,4 +1,4 @@
-// TODO: Add view mode � same pattern as FamilySurvey.jsx
+// TODO: Add view mode — same pattern as FamilySurvey.jsx
 import React from 'react';
 import BaseModuleForm from '../../../components/BaseModuleForm';
 
@@ -24,8 +24,8 @@ export default function DeathRecord() {
       collectionName="death_records"
       moduleName="death_record"
       fields={fields}
-      aadhaarPersonLabel="Deceased / मृत व्यक्ती"
+      aadhaarPersonLabel="Deceased / à¤®à¥ƒà¤¤ à¤µà¥�à¤¯à¤•à¥�à¤¤à¥€"
     />
   );
 }
-
+
