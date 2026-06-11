@@ -1,4 +1,21 @@
 {
+  "functions": [
+    {
+      "source": "functions/nightly_risk_engine",
+      "codebase": "nightly-risk-engine",
+      "ignore": ["node_modules", ".git", "firebase-debug.log"]
+    },
+    {
+      "source": "functions/vaccine_reminder",
+      "codebase": "vaccine-reminder",
+      "ignore": ["node_modules", ".git"]
+    },
+    {
+      "source": "functions/nrc_followup_check",
+      "codebase": "nrc-followup",
+      "ignore": ["node_modules", ".git"]
+    }
+  ],
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"

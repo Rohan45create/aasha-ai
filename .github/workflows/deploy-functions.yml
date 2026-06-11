@@ -1,0 +1,64 @@
+name: Deploy Cloud Functions
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'functions/**'
+      - '.github/workflows/deploy-functions.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy nightly risk engine
+        run: |
+          gcloud functions deploy nightly-risk-engine \
+            --gen2 \
+            --runtime=python312 \
+            --region=asia-south1 \
+            --source=functions/nightly_risk_engine \
+            --entry-point=nightly_risk_engine \
+            --trigger-http \
+            --no-allow-unauthenticated \
+            --memory=512MB \
+            --timeout=540s \
+            --project=ashaai-prod
+
+      - name: Deploy vaccine reminder
+        run: |
+          gcloud functions deploy vaccine-reminder \
+            --gen2 \
+            --runtime=python312 \
+            --region=asia-south1 \
+            --source=functions/vaccine_reminder \
+            --entry-point=vaccine_reminder \
+            --trigger-http \
+            --no-allow-unauthenticated \
+            --memory=256MB \
+            --timeout=300s \
+            --project=ashaai-prod
+
+      - name: Deploy NRC followup
+        run: |
+          gcloud functions deploy nrc-followup-check \
+            --gen2 \
+            --runtime=python312 \
+            --region=asia-south1 \
+            --source=functions/nrc_followup_check \
+            --entry-point=nrc_followup_check \
+            --trigger-http \
+            --no-allow-unauthenticated \
+            --memory=256MB \
+            --timeout=300s \
+            --project=ashaai-prod

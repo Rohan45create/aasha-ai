@@ -71,6 +71,22 @@
         { "fieldPath": "supervisorId", "order": "ASCENDING" },
         { "fieldPath": "isActive", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "household_members",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "aadhaarLast4", "order": "ASCENDING" },
+        { "fieldPath": "ashaId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ashaId", "order": "ASCENDING" },
+        { "fieldPath": "scheduledDate", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

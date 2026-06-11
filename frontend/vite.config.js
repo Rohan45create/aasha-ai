@@ -32,9 +32,35 @@ export default defineConfig({
         ]
       },
       workbox: {
+        // Add a cache version — increment this on every deploy
+        cacheId: 'ashaai-v2',
+        // Clean up old caches automatically
+        cleanupOutdatedCaches: true,
+        // Skip waiting — new SW activates immediately instead of waiting
+        skipWaiting: true,
+        clientsClaim: true,
         // Cache all the assets to enable offline mode
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,woff}'],
         runtimeCaching: [
+          {
+            // Firestore and API calls — always try network first
+            urlPattern: /^https:\/\/(firestore\.googleapis\.com|.*\.run\.app).*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-cache',
+              networkTimeoutSeconds: 5,
+              expiration: { maxAgeSeconds: 300 }
+            }
+          },
+          {
+            // Static assets — cache first, long TTL
+            urlPattern: /\.(?:js|css|woff2|png|svg|ico)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'static-cache-v2',
+              expiration: { maxEntries: 60, maxAgeSeconds: 86400 }
+            }
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
