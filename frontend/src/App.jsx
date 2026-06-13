@@ -48,11 +48,25 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { useAuthStore } from './stores/authStore';
 
-const LoadingFallback = ({ debugMessage }) => (
+const LoadingFallback = ({ authTimedOut }) => (
   <div className="min-h-screen bg-[#F1EFE8] flex flex-col p-4 animate-pulse">
-    {debugMessage && (
-      <div className="bg-red-100 text-red-800 p-4 rounded-xl mb-4 text-sm font-mono whitespace-pre-wrap border border-red-300">
-        Debug Info: {debugMessage}
+    {authTimedOut && (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', minHeight: '50vh', gap: '12px', padding: '24px'
+      }}>
+        <p style={{ color: '#666', fontSize: '14px' }}>
+          Taking longer than usual to load.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            padding: '10px 24px', background: '#1D9E75', color: 'white',
+            border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer'
+          }}
+        >
+          Reload
+        </button>
       </div>
     )}
     <div className="h-16 bg-gray-200 rounded-2xl w-full mb-6"></div>
@@ -68,14 +82,14 @@ const LoadingFallback = ({ debugMessage }) => (
 
 const App = () => {
   const { setUser, setRole, setLoading, setHeadId, setAshaId, isLoading } = useAuthStore();
-  const [debugMsg, setDebugMsg] = React.useState('');
+  const [authTimedOut, setAuthTimedOut] = React.useState(false);
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
       if (isLoading) {
-        setDebugMsg('Loading timed out after 5 seconds. This means onAuthStateChanged never completed, or Suspense is stuck.');
+        setAuthTimedOut(true);
       }
-    }, 5000);
+    }, 15000);
     return () => clearTimeout(timer);
   }, [isLoading]);
 
@@ -127,12 +141,12 @@ const App = () => {
   }, [setUser, setRole, setLoading, setHeadId, setAshaId]);
 
   if (isLoading) {
-    return <LoadingFallback debugMessage={debugMsg} />;
+    return <LoadingFallback authTimedOut={authTimedOut} />;
   }
 
   return (
     <BrowserRouter>
-      <Suspense fallback={<LoadingFallback debugMessage="Suspense is stuck loading the chunk!" />}>
+      <Suspense fallback={<LoadingFallback authTimedOut={false} />}>
         <Routes>
           <Route path="/login" element={<ASHALogin />} />
           <Route path="/admin/login" element={<AdminLogin />} />
