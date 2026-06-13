@@ -97,8 +97,8 @@ export default function AdminLogin() {
       </div>
       <div className="w-full lg:w-1/3 min-w-[400px] bg-[#F1EFE8] flex flex-col justify-center items-center py-12 px-8 z-10 relative shadow-[-20px_0_40px_rgba(0,0,0,0.2)]">
         <div className="w-full max-w-sm">
-          <div className="text-center mb-10">
-            <div className="w-16 h-16 bg-[#085041] rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-6 rotate-3">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-[#085041] rounded-2xl mx-auto flex items-center justify-center shadow-lg mb-3 rotate-3">
               <span className="material-symbols-outlined text-white text-3xl -rotate-3">shield_locked</span>
             </div>
             <h2 className="text-3xl font-bold mb-2">Admin Portal</h2>
@@ -161,7 +161,7 @@ export default function AdminLogin() {
               type="submit"
               id="admin-login-btn"
               disabled={isLoading}
-              className="w-full bg-[#1D9E75] text-white py-4 px-6 rounded-xl font-bold shadow-md hover:bg-[#085041] transition-all flex items-center justify-center disabled:opacity-50"
+              className="w-full bg-[#1D9E75] text-white py-3 px-6 rounded-xl font-bold shadow-md hover:bg-[#085041] transition-all flex items-center justify-center disabled:opacity-50"
             >
               {isLoading ? (
                 <span className="material-symbols-outlined animate-spin">refresh</span>
@@ -182,36 +182,38 @@ export default function AdminLogin() {
           </button>
 
           {/* Demo Credentials */}
-          <div className="mt-6 bg-[#EAF3DE] border border-[#1D9E75] rounded-xl p-4">
+          <div className="mt-4 bg-[#EAF3DE] border border-[#1D9E75] rounded-xl p-4">
             <p className="text-xs font-bold text-[#27500A] mb-2"><span className="material-symbols-outlined text-[16px] align-middle mr-1">key</span> Demo Credentials</p>
             <p className="text-xs text-[#27500A] font-mono">Email: admin@asha.gov.in</p>
             <p className="text-xs text-[#27500A] font-mono mt-1">Password: Admin@123</p>
             <p className="text-xs text-[#5F5E5A] mt-2">Create this account in Firebase Console → Authentication → Users</p>
           </div>
-        </div>
 
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 w-full max-w-xs">
-          <button onClick={() => navigate('/login')} className="text-sm text-[#5F5E5A] hover:text-[#085041] transition-colors underline">Return to ASHA Mobile App</button>
-          
-          <button
-            onClick={() => setShowNGOModal(true)}
-            style={{
-              width: '100%',
-              padding: '10px',
-              border: '1px solid #1D9E75',
-              borderRadius: '8px',
-              background: 'white',
-              color: '#1D9E75',
-              fontSize: '13px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>domain</span> NGO / Orphanage Portal
-          </button>
+          <div className="mt-6 flex flex-col items-center gap-3 w-full">
+            <button onClick={() => navigate('/login')} className="text-sm text-[#5F5E5A] hover:text-[#085041] transition-colors underline">Return to ASHA Mobile App</button>
+            
+            <button
+              onClick={() => setShowNGOModal(true)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #1D9E75',
+                borderRadius: '8px',
+                background: 'white',
+                color: '#1D9E75',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+              className="hover:bg-[#EAF3DE] transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">business</span>
+              NGO / Orphanage Portal
+            </button>
+          </div>
         </div>
       </div>
 
