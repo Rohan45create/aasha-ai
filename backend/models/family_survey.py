@@ -19,6 +19,9 @@ class FamilyMemberRecord(BaseModel):
     reason_removed_from_register: Optional[str]     # वगळले असल्यास कारण
     asha_id: str                                    # Which ASHA submitted
     household_id: str                               # Parent household
+    has_genetic_condition: Optional[bool] = False   # अनुवांशिक आजार आहे का?
+    genetic_conditions: Optional[list[str]] = []    # अनुवांशिक आजारांची नावे
+    genetic_condition_notes: Optional[str] = None   # आजाराबद्दल अधिक माहिती
     created_at: Optional[str]
     updated_at: Optional[str]
     source: Literal["manual", "voice", "ocr_import", "ambient"]
