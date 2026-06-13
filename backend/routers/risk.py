@@ -55,6 +55,18 @@ async def calculate_risk_now(asha_id: str, user=Depends(verify_firebase_token)):
 
         days_since = (datetime.now() - lv_dt).days
         
+        household_id = child.get("householdId")
+        family_genetic_risk = False
+        if household_id:
+            try:
+                members_docs = db.collection("household_members").where("householdId", "==", household_id).stream()
+                for m in members_docs:
+                    if m.to_dict().get("has_genetic_condition", False):
+                        family_genetic_risk = True
+                        break
+            except Exception as e:
+                logger.error("genetic_check_failed", error=str(e))
+        
         signals = {
             "days_since_last_visit": days_since,
             "sibling_malnutrition": child.get("siblingMalnutritionHistory", False),
@@ -62,7 +74,8 @@ async def calculate_risk_now(asha_id: str, user=Depends(verify_firebase_token)):
             "breastfeeding_cessation_months": child.get("breastfeedingCessationMonths", 12),
             "vaccination_gap_days": child.get("vaccinationGapDays", 0),
             "malnutrition_grade": child.get("malnutritionGrade", "Normal"),
-            "age_months": child.get("ageMonths", 12)
+            "age_months": child.get("ageMonths", 12),
+            "family_genetic_risk": family_genetic_risk
         }
         
         prompt = f"""Calculate health risk score for this child. Return ONLY valid JSON:
@@ -71,7 +84,8 @@ async def calculate_risk_now(asha_id: str, user=Depends(verify_firebase_token)):
   "urgency_days": 1-30}}
 Signals: {json.dumps(signals)}
 Rules: CRITICAL=76-100, HIGH=51-75, MEDIUM=26-50, LOW=0-25
-SAM malnutrition = automatic CRITICAL. Days since visit >21 = HIGH minimum."""
+SAM malnutrition = automatic CRITICAL. Days since visit >21 = HIGH minimum. 
+If family_genetic_risk is true, add 15 points to the base score."""
         
         try:
             response = model.generate_content(prompt,

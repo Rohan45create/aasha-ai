@@ -205,6 +205,28 @@ async def add_worker(
 # TASK 3: PENDING REVIEWS
 # ============================================================================
 
+@router.post("/pending-reviews")
+async def create_pending_review(
+    payload: dict = Body(...),
+    user=Depends(verify_firebase_token)
+):
+    """Create a new pending review (e.g. for NGO referral)"""
+    try:
+        db = firestore.Client()
+        db.collection("pending_reviews").add({
+            "ashaId": user.get("uid"),
+            "reviewStatus": "pending",
+            "type": payload.get("type", "GENERAL_REVIEW"),
+            "title": payload.get("title", "Review Required"),
+            "linkedCollection": payload.get("collectionName"),
+            "linkedDocId": payload.get("docId"),
+            "createdAt": firestore.SERVER_TIMESTAMP
+        })
+        return {"success": True}
+    except Exception as e:
+        logger.error("create_pending_review_error", error=str(e))
+        raise HTTPException(status_code=500, detail="Error creating review")
+
 @router.post("/supervisor/review/{review_id}/approve")
 async def approve_review(review_id: str, user=Depends(require_role("asha_head"))):
     """Approve a pending review."""

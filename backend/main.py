@@ -12,7 +12,7 @@ from services.redis_service import init_redis, close_redis, ping as redis_ping
 
 # Import routers
 from routers.modules import family_survey
-from routers import risk, voice, admin, vision, ambient, security, register, members, chat, translate, appointments
+from routers import risk, voice, admin, vision, ambient, security, register, members, chat, translate, appointments, ngo, anc, disease
 
 # Initialize External Services
 initialize_firebase()
@@ -63,6 +63,10 @@ app.include_router(members.router, dependencies=[Depends(verify_firebase_token)]
 app.include_router(chat.router, dependencies=[Depends(verify_firebase_token)])
 app.include_router(translate.router, dependencies=[Depends(verify_firebase_token)])
 app.include_router(appointments.router, dependencies=[Depends(verify_firebase_token)])
+app.include_router(ngo.router, dependencies=[Depends(verify_firebase_token)])
+app.include_router(ngo.public_router)
+app.include_router(anc.router, dependencies=[Depends(verify_firebase_token)])
+app.include_router(disease.router, dependencies=[Depends(verify_firebase_token)])
 
 
 # Ambient AI WebSocket — authenticates internally via query param
