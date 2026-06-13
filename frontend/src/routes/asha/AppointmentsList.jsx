@@ -29,13 +29,16 @@ export default function AppointmentsList() {
     return () => { isUnmounted = true; };
   }, [docId]);
 
-  const handleCompleteVisit = async (id) => {
+  const handleCompleteVisit = async (visit) => {
     try {
-      await apiFetch(`/api/appointments/${id}/complete`, {
+      await apiFetch(`/api/appointments/${visit.id}/complete`, {
         method: 'PATCH',
-        body: JSON.stringify({ notes: 'Completed from appointments list' })
+        body: JSON.stringify({ 
+          notes: 'Completed from appointments list',
+          type: visit.type
+        })
       });
-      setVisits(prev => prev.filter(v => v.id !== id));
+      setVisits(prev => prev.filter(v => v.id !== visit.id));
       showToast('Visit marked as complete ✓', 'success');
     } catch (err) {
       showToast('Failed to complete visit', 'error');
@@ -79,15 +82,31 @@ export default function AppointmentsList() {
                       📅 {dateStr} at {visit.scheduledTime || 'TBD'}
                     </p>
                     <button 
-                      onClick={() => handleCompleteVisit(visit.id)}
-                      className="px-4 py-2 bg-[#1D9E75] text-white rounded-xl text-sm font-bold shadow-sm active:scale-95 hover:bg-[#16815e] transition-colors"
+                      onClick={() => handleCompleteVisit(visit)}
+                      className="px-4 py-2 bg-[#1D9E75] text-white rounded-xl text-sm font-bold shadow-sm active:scale-95 hover:bg-[#16815e] transition-colors whitespace-nowrap"
                     >
                       Done ✓
                     </button>
                   </div>
                   <div>
-                    <h3 className="font-bold text-[#1A1A18] text-lg mb-1">{visit.targetName}</h3>
-                    <p className="text-sm text-[#5F5E5A] bg-gray-50 p-2 rounded-lg border border-gray-100">{visit.purpose || 'General checkup'}</p>
+                    <h3 className="font-bold text-[#1A1A18] text-lg mb-1 flex items-center gap-2">
+                      {visit.targetName}
+                      {visit.type === 'ngo' && (
+                        <span className="bg-[#0288D1] text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">NGO</span>
+                      )}
+                    </h3>
+                    <p className="text-sm text-[#5F5E5A] bg-gray-50 p-2 rounded-lg border border-gray-100 mb-2">{visit.purpose || 'General checkup'}</p>
+                    {(visit.ngoAddress || visit.address) && (
+                      <a 
+                        href={`https://maps.google.com/?q=${encodeURIComponent(visit.ngoAddress || visit.address)}`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-xs text-[#0288D1] flex items-center gap-1 mt-1 hover:underline w-max bg-[#E1F5FE] px-2 py-1 rounded-md font-medium"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">map</span>
+                        View Location in Map
+                      </a>
+                    )}
                   </div>
                 </div>
               );

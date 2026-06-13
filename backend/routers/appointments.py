@@ -56,7 +56,46 @@ async def get_upcoming_appointments(asha_id: str, user=Depends(verify_firebase_t
         for doc in docs:
             d = doc.to_dict()
             if d.get("scheduledDate", "") >= today and d.get("status") == "scheduled":
+                d["type"] = "regular"
+                address = "Address not provided"
+                if d.get("targetType") == "family" and d.get("targetId"):
+                    try:
+                        hh_doc = db.collection("households").document(d["targetId"]).get()
+                        if hh_doc.exists:
+                            address = hh_doc.to_dict().get("village", address)
+                    except Exception:
+                        pass
+                d["address"] = address
                 appointments.append({"id": doc.id, **d})
+                
+        # Also fetch NGO appointments
+        ngo_docs = db.collection("ngo_appointments") \
+            .where("assignedAshaIds", "array_contains", asha_id) \
+            .stream()
+            
+        for doc in ngo_docs:
+            d = doc.to_dict()
+            if d.get("scheduledDate", "") >= today and d.get("status") == "scheduled":
+                address = "Address not provided"
+                if d.get("ngoId"):
+                    try:
+                        ngo_doc = db.collection("ngos").document(d["ngoId"]).get()
+                        if ngo_doc.exists:
+                            address = ngo_doc.to_dict().get("address", address)
+                    except Exception:
+                        pass
+                
+                appointments.append({
+                    "id": doc.id,
+                    "targetName": d.get("ngoName"),
+                    "purpose": d.get("purpose", "NGO Visit"),
+                    "scheduledDate": d.get("scheduledDate"),
+                    "scheduledTime": d.get("scheduledTime", "10:00"),
+                    "type": "ngo",
+                    "ngoId": d.get("ngoId"),
+                    "address": address,
+                    **d
+                })
                 
         # Sort by scheduledDate ASC in memory
         appointments.sort(key=lambda x: x.get("scheduledDate", ""))
@@ -77,7 +116,8 @@ async def complete_appointment(
 ):
     try:
         db = firestore.Client()
-        db.collection("appointments").document(appointment_id).update({
+        collection_name = "ngo_appointments" if payload.get("type") == "ngo" else "appointments"
+        db.collection(collection_name).document(appointment_id).update({
             "status": "completed",
             "notes": payload.get("notes", ""),
             "completedAt": firestore.SERVER_TIMESTAMP
