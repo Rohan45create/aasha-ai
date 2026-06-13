@@ -142,6 +142,27 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /village_health/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /family_planning/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /elderly_care/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
+
     // ==========================================
     // MODULE SUBMISSIONS
     // ==========================================

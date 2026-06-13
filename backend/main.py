@@ -47,8 +47,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:5174").split(","),
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH"],  # No DELETE — data is permanent
-    allow_headers=["Authorization", "Content-Type"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 app.add_middleware(LoggingMiddleware)
 

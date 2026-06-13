@@ -139,13 +139,6 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "scheduledDate", "order": "DESCENDING" }
       ]
-    },
-    {
-      "collectionGroup": "ngos",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "email", "order": "ASCENDING" }
-      ]
     }
   ],
   "fieldOverrides": []
