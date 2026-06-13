@@ -66,6 +66,9 @@ export default React.memo(function Home() {
   const [visitsLoading, setVisitsLoading] = useState(true);
   const [sheetData, setSheetData] = useState({ isOpen: false, targetType: '', targetId: '', targetName: '' });
 
+  const [ngoVisits, setNgoVisits] = useState([]);
+  const [ngoVisitsLoading, setNgoVisitsLoading] = useState(true);
+
   const [activeFilter, setActiveFilter] = useState(null);
 
   const filteredSubmissions = useMemo(() => {
@@ -233,8 +236,28 @@ export default React.memo(function Home() {
       }
     };
     
+    const loadNgoVisits = () => {
+      const qNgo = query(
+        collection(db, 'ngo_appointments'),
+        where('ashaId', '==', docId),
+        where('status', '==', 'upcoming')
+      );
+      return onSnapshot(qNgo, (snap) => {
+        const visits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Sort by date
+        visits.sort((a,b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
+        if (!isUnmounted) {
+          setNgoVisits(visits.slice(0, 3));
+          setNgoVisitsLoading(false);
+        }
+      }, (err) => {
+        if (!isUnmounted) setNgoVisitsLoading(false);
+      });
+    };
+    
     loadVisits();
-    return () => { isUnmounted = true; };
+    const unsubNgo = loadNgoVisits();
+    return () => { isUnmounted = true; unsubNgo(); };
   }, [docId]);
 
   const handleCompleteVisit = async (id) => {
@@ -491,6 +514,40 @@ export default React.memo(function Home() {
                       className="px-3 py-1.5 bg-[#1D9E75] text-white rounded-lg text-xs font-bold shadow-sm active:scale-95"
                     >
                       Done ✓
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* NGO Visits Section */}
+        {ngoVisits.length > 0 && (
+          <div className="bg-[#E1F5FE] rounded-2xl p-5 shadow-sm border border-[#0288D1]">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-[#01579B] flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#0288D1]">business</span>
+                NGO / Orphanage Visits
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {ngoVisits.map(visit => {
+                const dateObj = new Date(visit.scheduledDate);
+                const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                
+                return (
+                  <div key={visit.id} className="flex items-center justify-between p-3 bg-white border border-[#B3E5FC] rounded-xl">
+                    <div>
+                      <p className="text-xs font-bold text-[#0288D1] mb-0.5">📅 {dateStr}</p>
+                      <h3 className="font-bold text-[#1A1A18] text-sm">{visit.ngoName}</h3>
+                      <p className="text-xs text-[#5F5E5A]">{visit.ngoAddress}</p>
+                    </div>
+                    <button 
+                      onClick={() => navigate('/asha/register-scan', { state: { ngoId: visit.ngoId, appointmentId: visit.id }})}
+                      className="px-3 py-1.5 bg-[#0288D1] text-white rounded-lg text-xs font-bold shadow-sm active:scale-95"
+                    >
+                      Record Children ➔
                     </button>
                   </div>
                 );

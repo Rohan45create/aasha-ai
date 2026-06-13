@@ -41,14 +41,20 @@ const WorkerActivity = lazy(() => import('./routes/admin/WorkerActivity.jsx'));
 const PendingReview = lazy(() => import('./routes/admin/PendingReview.jsx'));
 const Reports = lazy(() => import('./routes/admin/Reports.jsx'));
 const AdminReferrals = lazy(() => import('./routes/admin/Referrals.jsx'));
+const NGOManagement = lazy(() => import('./routes/admin/NGOManagement.jsx'));
 
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { useAuthStore } from './stores/authStore';
 
-const LoadingFallback = () => (
+const LoadingFallback = ({ debugMessage }) => (
   <div className="min-h-screen bg-[#F1EFE8] flex flex-col p-4 animate-pulse">
+    {debugMessage && (
+      <div className="bg-red-100 text-red-800 p-4 rounded-xl mb-4 text-sm font-mono whitespace-pre-wrap border border-red-300">
+        Debug Info: {debugMessage}
+      </div>
+    )}
     <div className="h-16 bg-gray-200 rounded-2xl w-full mb-6"></div>
     <div className="h-32 bg-[#EAF3DE] rounded-3xl w-full mb-6 opacity-60"></div>
     <div className="grid grid-cols-2 gap-4">
@@ -62,8 +68,23 @@ const LoadingFallback = () => (
 
 const App = () => {
   const { setUser, setRole, setLoading, setHeadId, setAshaId, isLoading } = useAuthStore();
+  const [debugMsg, setDebugMsg] = React.useState('');
 
   React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (isLoading) {
+        setDebugMsg('Loading timed out after 5 seconds. This means onAuthStateChanged never completed, or Suspense is stuck.');
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
+  React.useEffect(() => {
+    const handleLogout = () => {
+      useAuthStore.getState().logout();
+    };
+    window.addEventListener('auth:logout', handleLogout);
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user);
@@ -99,16 +120,19 @@ const App = () => {
       }
       setLoading(false);
     });
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      window.removeEventListener('auth:logout', handleLogout);
+    };
   }, [setUser, setRole, setLoading, setHeadId, setAshaId]);
 
   if (isLoading) {
-    return <LoadingFallback />;
+    return <LoadingFallback debugMessage={debugMsg} />;
   }
 
   return (
     <BrowserRouter>
-      <Suspense fallback={<LoadingFallback />}>
+      <Suspense fallback={<LoadingFallback debugMessage="Suspense is stuck loading the chunk!" />}>
         <Routes>
           <Route path="/login" element={<ASHALogin />} />
           <Route path="/admin/login" element={<AdminLogin />} />
@@ -146,6 +170,7 @@ const App = () => {
             <Route path="/admin/map" element={<CoverageMap />} />
             <Route path="/admin/reports" element={<Reports />} />
             <Route path="/admin/referrals" element={<AdminReferrals />} />
+            <Route path="/admin/ngos" element={<NGOManagement />} />
           </Route>
 
           {/* Redirects */}

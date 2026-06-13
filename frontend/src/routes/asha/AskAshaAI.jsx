@@ -5,13 +5,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder';
 import { useTx } from '../../context/TranslationContext';
 
-// Fallback for language store if it isn't created yet
-let useLanguageStore;
-try {
-  useLanguageStore = require('../../stores/languageStore').useLanguageStore;
-} catch (e) {
-  useLanguageStore = () => ({ currentLanguage: 'en' });
-}
+import { useLanguageStore } from '../../stores/languageStore';
 
 const QUICK_QUESTIONS = [
   { label: 'SAM Signs?', q: 'What are the signs of Severe Acute Malnutrition in a child?' },

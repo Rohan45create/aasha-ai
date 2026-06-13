@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../../stores/authStore';
-import { apiFetch, showToast } from '../../utils/api';
+import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../../stores/authStore";
+import { apiFetch, showToast } from "../../utils/api";
 
 export default function AppointmentsList() {
   const navigate = useNavigate();
