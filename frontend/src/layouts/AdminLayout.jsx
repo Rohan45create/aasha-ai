@@ -20,6 +20,7 @@ export default function AdminLayout() {
     { path: '/admin/dashboard', icon: 'dashboard',        labelKey: 'admin_dashboard',   label: 'Dashboard' },
     { path: '/admin/workers',   icon: 'group',             labelKey: 'worker_management', label: 'Workers' },
     { path: '/admin/referrals', icon: 'local_hospital',    labelKey: 'referrals',         label: 'NRC Referrals' },
+    { path: '/admin/ngos',      icon: 'business',          labelKey: 'ngos',              label: 'NGOs' },
     { path: '/admin/review',    icon: 'pending_actions',   labelKey: 'pending_review',    label: 'Pending Review' },
     { path: '/admin/builder',   icon: 'build',             labelKey: 'survey_builder',    label: 'Survey Builder' },
     { path: '/admin/map',       icon: 'map',               labelKey: 'coverage_map',      label: 'Coverage Map' },
