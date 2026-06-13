@@ -59,6 +59,7 @@ export default React.memo(function FamilySurvey() {
       abha_id: '', birth_register_serial: '',
       reason_removed_from_register: '',
       noAadhaar: false, temporaryId: '',
+      has_genetic_condition: false, genetic_conditions: '', genetic_condition_notes: '',
       voiceFilled: [], isDuplicate: false, existingId: null
     })));
   };
@@ -209,6 +210,9 @@ export default React.memo(function FamilySurvey() {
           temporaryId: m.temporaryId || null,
           mobileNumber: m.mobile_number || null,
           abhaId: m.abha_id || null,
+          has_genetic_condition: m.has_genetic_condition || false,
+          genetic_conditions: m.genetic_conditions ? m.genetic_conditions.split(',').map(s=>s.trim()) : [],
+          genetic_condition_notes: m.genetic_condition_notes || '',
           source: 'manual',
           existingId: m.existingId
         }, ashaId);
@@ -279,6 +283,7 @@ export default React.memo(function FamilySurvey() {
       abha_id: '', birth_register_serial: '',
       reason_removed_from_register: '',
       noAadhaar: false, temporaryId: '',
+      has_genetic_condition: false, genetic_conditions: '', genetic_condition_notes: '',
       voiceFilled: [], isDuplicate: false, existingId: null
     }]);
     setExpandedMember(members.length);
@@ -500,6 +505,25 @@ export default React.memo(function FamilySurvey() {
                         <input type="tel" maxLength={10} value={member.mobile_number} onChange={e => updateMember(index, 'mobile_number', e.target.value)} className={getInputClass(member.id, 'mobile_number')} placeholder="10 digits" />
                         {getVoiceTag(member.id, 'mobile_number')}
                      </div>
+                  </div>
+
+                  <div className="border-t pt-4 mt-2">
+                    <label className="flex items-center gap-2 cursor-pointer mb-3">
+                      <input type="checkbox" className="w-5 h-5 text-[#1D9E75] rounded focus:ring-[#1D9E75]" checked={member.has_genetic_condition} onChange={e => updateMember(index, 'has_genetic_condition', e.target.checked)} />
+                      <span className="font-bold text-[#1A1A18]">Has Genetic / Hereditary Condition?</span>
+                    </label>
+                    {member.has_genetic_condition && (
+                      <div className="space-y-3 bg-[#FCEBEB] p-4 rounded-xl border border-[#E24B4A]">
+                        <div>
+                          <label className="block text-xs font-bold mb-1 text-[#791F1F]">Conditions (comma separated)</label>
+                          <input type="text" value={member.genetic_conditions} onChange={e => updateMember(index, 'genetic_conditions', e.target.value)} className="w-full p-2 border border-[#E24B4A] rounded-lg focus:outline-none" placeholder="e.g. Sickle Cell, Thalassemia, Diabetes" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold mb-1 text-[#791F1F]">Additional Notes</label>
+                          <textarea value={member.genetic_condition_notes} onChange={e => updateMember(index, 'genetic_condition_notes', e.target.value)} className="w-full p-2 border border-[#E24B4A] rounded-lg focus:outline-none" rows="2" placeholder="Any specific details..."></textarea>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
