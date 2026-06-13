@@ -1,15 +1,15 @@
 // TODO: Add view mode — same pattern as FamilySurvey.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import BaseModuleForm from '../../../components/BaseModuleForm';
 import AadhaarLinkagePopup from '../../../components/AadhaarLinkagePopup';
 import { apiFetch } from '../../../utils/api';
 
 const FIELDS = [
-  { id: 'mother_name', label: 'Pregnant Woman Name / à¤—à¤°à¥�à¤­à¤µà¤¤à¥€ à¤¨à¤¾à¤µ', required: true, placeholder: 'Full name' },
-  { id: 'husband_name', label: 'Husband Name / à¤ªà¤¤à¥€à¤šà¥‡ à¤¨à¤¾à¤µ', required: true, placeholder: 'Full name' },
+  { id: 'mother_name', label: 'Pregnant Woman Name / गरोदर महिलेचे नाव', required: true, placeholder: 'Full name' },
+  { id: 'husband_name', label: 'Husband Name / पतीचे नाव', required: true, placeholder: 'Full name' },
   { id: 'age', label: 'Age (years)', type: 'number', required: true },
-  { id: 'lmp_date', label: 'LMP Date / à¤¶à¥‡à¤µà¤Ÿà¤šà¥€ à¤®à¤¾à¤¸à¤¿à¤• à¤ªà¤¾à¤³à¥€', type: 'date', required: true },
-  { id: 'edd_date', label: 'Expected Delivery Date / à¤…à¤ªà¥‡à¤•à¥�à¤·à¤¿à¤¤ à¤¤à¤¾à¤°à¥€à¤–', type: 'date' },
+  { id: 'lmp_date', label: 'LMP Date / शेवटची मासिक पाळी', type: 'date', required: true },
+  { id: 'edd_date', label: 'Expected Delivery Date / अपेक्षित तारीख', type: 'date' },
   { id: 'registration_date', label: 'Registration Date', type: 'date', required: true },
   { id: 'gravida', label: 'Gravida (Total Pregnancies)', type: 'number', placeholder: '1' },
   { id: 'para', label: 'Para (Deliveries)', type: 'number', placeholder: '0' },
@@ -33,6 +33,9 @@ export default function ANCRegistration() {
   const [linkageData, setLinkageData] = useState(null);
   const [linkageConfirmedData, setLinkageConfirmedData] = useState(null);
 
+  const [prediction, setPrediction] = useState(null);
+  const [loadingPrediction, setLoadingPrediction] = useState(false);
+
   const handleAadhaarEntered = async (last4) => {
     try {
       const result = await apiFetch('/api/members/check-linkage', {
@@ -51,6 +54,24 @@ export default function ANCRegistration() {
   const handleConfirmLinkage = () => {
     setShowLinkagePopup(false);
     setLinkageConfirmedData(linkageData);
+    fetchGeneticPrediction(linkageData.household_id);
+  };
+
+  const fetchGeneticPrediction = async (householdId) => {
+    setLoadingPrediction(true);
+    try {
+      // In a real flow, you would pass the current form values in 'motherData'
+      // For now, we fetch just based on household linkages
+      const pred = await apiFetch('/api/anc/genetic-prediction', {
+        method: 'POST',
+        body: JSON.stringify({ householdId, motherData: { age: 25 } })
+      });
+      setPrediction(pred);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingPrediction(false);
+    }
   };
 
   const handleRejectLinkage = () => {
@@ -76,17 +97,55 @@ export default function ANCRegistration() {
     }
   };
 
+  const CustomSection = () => {
+    if (loadingPrediction) {
+      return <div className="mt-4 p-4 bg-[#EAF3DE] rounded-xl text-center text-[#1D9E75] font-bold animate-pulse">Analyzing Genetic Risk...</div>;
+    }
+    if (!prediction) return null;
+
+    const isHigh = prediction.riskLevel === 'HIGH' || prediction.riskLevel === 'MODERATE';
+    return (
+      <div className={`mt-4 p-5 rounded-2xl border ${isHigh ? 'bg-[#FCEBEB] border-[#E24B4A]' : 'bg-[#EAF3DE] border-[#1D9E75]'}`}>
+        <h3 className={`font-bold text-lg mb-2 flex items-center gap-2 ${isHigh ? 'text-[#791F1F]' : 'text-[#085041]'}`}>
+          <span className="material-symbols-outlined">genetics</span>
+          AI Genetic & Maternal Risk Prediction
+        </h3>
+        <p className={`text-sm font-bold mb-2 ${isHigh ? 'text-[#E24B4A]' : 'text-[#1D9E75]'}`}>Risk Level: {prediction.riskLevel}</p>
+        <p className="text-sm text-gray-700 mb-4">{prediction.predictionSummary}</p>
+        
+        {prediction.recommendedTests && prediction.recommendedTests.length > 0 && (
+          <div className="mb-3">
+            <h4 className="text-xs font-bold uppercase text-gray-500">Recommended Tests</h4>
+            <ul className="list-disc pl-5 text-sm text-gray-700">
+              {prediction.recommendedTests.map((t, i) => <li key={i}>{t}</li>)}
+            </ul>
+          </div>
+        )}
+        
+        {prediction.precautions && prediction.precautions.length > 0 && (
+          <div>
+            <h4 className="text-xs font-bold uppercase text-gray-500">Precautions</h4>
+            <ul className="list-disc pl-5 text-sm text-gray-700">
+              {prediction.precautions.map((p, i) => <li key={i}>{p}</li>)}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       <BaseModuleForm 
-        title="ANC Registration / à¤—à¤°à¥�à¤­à¤µà¤¤à¥€ à¤¨à¥‹à¤‚à¤¦à¤£à¥€" 
+        title="ANC Registration / गरोदर नोंदणी" 
         moduleIcon="pregnant_woman" 
         collectionName="pregnancies"
         moduleName="anc"
         fields={FIELDS}
-        aadhaarPersonLabel="Mother / à¤—à¤°à¥�à¤­à¤µà¤¤à¥€"
+        aadhaarPersonLabel="Mother / गर्भवती"
         onAadhaarScanned={handleAadhaarEntered}
         afterSubmit={handleAfterSubmit}
+        renderCustomTop={CustomSection}
       />
       <AadhaarLinkagePopup
         isOpen={showLinkagePopup}
