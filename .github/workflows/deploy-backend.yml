@@ -26,10 +26,14 @@ jobs:
         env:
           ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
+          GOOGLE_FORM_SECRET: ${{ secrets.GOOGLE_FORM_SECRET }}
+          NGO_RESCHEDULE_FORM_URL: ${{ secrets.NGO_RESCHEDULE_FORM_URL }}
+          NGO_RESCHEDULE_FORM_EMAIL_ENTRY: ${{ secrets.NGO_RESCHEDULE_FORM_EMAIL_ENTRY }}
+          NGO_RESCHEDULE_FORM_DATE_ENTRY: ${{ secrets.NGO_RESCHEDULE_FORM_DATE_ENTRY }}
         run: |
           cd backend
-          printf 'ENVIRONMENT: "production"\nALLOWED_ORIGINS: "%s"\nREDIS_URL: "%s"\n' \
-            "$ALLOWED_ORIGINS" "$REDIS_URL" > /tmp/env-vars.yaml
+          printf 'ENVIRONMENT: "production"\nALLOWED_ORIGINS: "%s"\nREDIS_URL: "%s"\nGOOGLE_FORM_SECRET: "%s"\nNGO_RESCHEDULE_FORM_URL: "%s"\nNGO_RESCHEDULE_FORM_EMAIL_ENTRY: "%s"\nNGO_RESCHEDULE_FORM_DATE_ENTRY: "%s"\n' \
+            "$ALLOWED_ORIGINS" "$REDIS_URL" "$GOOGLE_FORM_SECRET" "$NGO_RESCHEDULE_FORM_URL" "$NGO_RESCHEDULE_FORM_EMAIL_ENTRY" "$NGO_RESCHEDULE_FORM_DATE_ENTRY" > /tmp/env-vars.yaml
           gcloud run deploy aasha-api \
             --source . \
             --region asia-south1 \
