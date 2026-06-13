@@ -20,7 +20,7 @@ export default function NGOManagement() {
   const [selectedNgo, setSelectedNgo] = useState(null);
   
   const [newNgo, setNewNgo] = useState({ name: '', address: '', contact: '', capacity: '' });
-  const [scheduleData, setScheduleData] = useState({ ashaId: '', scheduledDate: '' });
+  const [scheduleData, setScheduleData] = useState({ ashaId: '', scheduledDate: '', scheduledTime: '10:00', purpose: 'Routine child health monitoring visit' });
   
   const [expandedNgoId, setExpandedNgoId] = useState(null);
   const [ngoAppointments, setNgoAppointments] = useState({});
@@ -92,25 +92,32 @@ export default function NGOManagement() {
   const handleSchedule = async (e) => {
     e.preventDefault();
     try {
-      await apiFetch('/api/ngo/appointment/schedule', {
+      // Use book-appointment which sends email to NGO
+      await apiFetch('/api/ngo/book-appointment', {
         method: 'POST',
         body: JSON.stringify({
-          ngoId: selectedNgo.id,
-          ashaId: scheduleData.ashaId,
-          scheduledDate: new Date(scheduleData.scheduledDate).toISOString()
+          ngo_id: selectedNgo.id,
+          ngo_email: selectedNgo.email || '',
+          ngo_name: selectedNgo.name,
+          scheduled_date: scheduleData.scheduledDate,
+          scheduled_time: scheduleData.scheduledTime,
+          purpose: scheduleData.purpose,
+          assigned_asha_ids: scheduleData.ashaId === 'all' ? ['all'] : [scheduleData.ashaId],
+          head_id: scheduleData.ashaId
         })
       });
-      alert(tx('Appointment scheduled successfully'));
+      alert(tx('Appointment scheduled — email sent to NGO'));
       setShowSchedule(false);
       setSelectedNgo(null);
-      setScheduleData({ ashaId: '', scheduledDate: '' });
+      setScheduleData({ ashaId: '', scheduledDate: '', scheduledTime: '10:00', purpose: 'Routine child health monitoring visit' });
       
       // refresh if expanded
-      if (expandedNgoId === selectedNgo.id) {
+      if (expandedNgoId === selectedNgo?.id) {
         const data = await apiFetch(`/api/ngo/${selectedNgo.id}/appointments`);
         setNgoAppointments(prev => ({...prev, [selectedNgo.id]: data.appointments}));
       }
     } catch (err) {
+      console.error('Schedule error:', err);
       alert(tx('Failed to schedule appointment'));
     }
   };
@@ -291,24 +298,40 @@ export default function NGOManagement() {
       {showSchedule && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">{tx('Schedule Visit')}: {selectedNgo?.name}</h2>
+            <h2 className="text-xl font-bold mb-1">{tx('Schedule Visit')}</h2>
+            <p className="text-sm text-[#5F5E5A] mb-4">{selectedNgo?.name}</p>
             <form onSubmit={handleSchedule} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">{tx('Select ASHA Worker')}</label>
+                <label className="block text-sm font-medium mb-1">{tx('Assign ASHA Worker')}</label>
                 <select required value={scheduleData.ashaId} onChange={e => setScheduleData({...scheduleData, ashaId: e.target.value})} className="w-full p-2 border rounded-lg focus:outline-none focus:border-[#1D9E75]">
                   <option value="">{tx('Select...')}</option>
+                  <option value="all">All Workers</option>
                   {workers.map(w => (
                     <option key={w.id} value={w.id}>{w.name || w.id}</option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">{tx('Date')}</label>
-                <input required type="date" value={scheduleData.scheduledDate} onChange={e => setScheduleData({...scheduleData, scheduledDate: e.target.value})} className="w-full p-2 border rounded-lg focus:outline-none focus:border-[#1D9E75]"/>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium mb-1">{tx('Date')}</label>
+                  <input required type="date" min={new Date().toISOString().split('T')[0]} value={scheduleData.scheduledDate} onChange={e => setScheduleData({...scheduleData, scheduledDate: e.target.value})} className="w-full p-2 border rounded-lg focus:outline-none focus:border-[#1D9E75]"/>
+                </div>
+                <div className="w-32">
+                  <label className="block text-sm font-medium mb-1">{tx('Time')}</label>
+                  <input required type="time" value={scheduleData.scheduledTime} onChange={e => setScheduleData({...scheduleData, scheduledTime: e.target.value})} className="w-full p-2 border rounded-lg focus:outline-none focus:border-[#1D9E75]"/>
+                </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">{tx('Purpose')}</label>
+                <input required type="text" value={scheduleData.purpose} onChange={e => setScheduleData({...scheduleData, purpose: e.target.value})} className="w-full p-2 border rounded-lg focus:outline-none focus:border-[#1D9E75]"/>
+              </div>
+              <p className="text-xs text-[#5F5E5A] flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">mail</span>
+                An email notification will be sent to the NGO automatically.
+              </p>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowSchedule(false)} className="flex-1 py-2 text-gray-600 border rounded-xl">{tx('Cancel')}</button>
-                <button type="submit" className="flex-1 py-2 bg-[#1D9E75] text-white rounded-xl font-bold">{tx('Schedule')}</button>
+                <button type="submit" className="flex-1 py-2 bg-[#1D9E75] text-white rounded-xl font-bold">{tx('Schedule & Notify')}</button>
               </div>
             </form>
           </div>

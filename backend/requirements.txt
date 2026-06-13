@@ -16,3 +16,6 @@ websockets>=12.0
 
 # Cache layer
 redis[asyncio]==5.0.8
+
+# Local dev — load .env variables
+python-dotenv>=1.0.0

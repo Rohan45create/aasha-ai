@@ -12,6 +12,26 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/api/ngo", tags=["NGO Integration"])
 public_router = APIRouter(prefix="/api/ngo", tags=["NGO Integration Public"])
 
+# ─── TEMP: Remove after confirming email works ───────────────────────────────
+@router.get("/test-email")
+async def test_email_endpoint(decoded_token: dict = Depends(verify_firebase_token)):
+    """Temporary endpoint to verify Gmail SMTP config is working."""
+    import os, smtplib
+    sender = os.getenv("GMAIL_SENDER_EMAIL")
+    password = os.getenv("GMAIL_APP_PASSWORD")
+    if not sender or not password:
+        return {"ok": False, "error": "Env vars missing", "sender": sender, "password_set": bool(password)}
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587) as s:
+            s.starttls()
+            s.login(sender, password)
+            s.sendmail(sender, sender, f"Subject: AshaAI SMTP Test\n\nSMTP is working!")
+        return {"ok": True, "sent_to": sender}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "sender": sender}
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 @router.get("/list/{asha_id}")
 async def list_ngos(asha_id: str, decoded_token: dict = Depends(verify_firebase_token)):
     """List all NGOs (or filtered by asha_id if we want mapping)"""
@@ -120,6 +140,7 @@ class FormSubmissionPayload(BaseModel):
     request_type: Optional[str] = None
     preferred_date_1: Optional[str] = None
     preferred_date_2: Optional[str] = None
+    preferred_date_3: Optional[str] = None  # Third slot — first two may be taken by pre-filled form entries
     google_form_secret: str
 
 @public_router.post("/form-submission")
@@ -184,23 +205,36 @@ async def form_submission(payload: FormSubmissionPayload):
         return {"status": "submitted"}
 
     elif payload.form_type == "appointment_change":
-        # Find existing appointment for this NGO
+        # Find the most recent scheduled appointment for this NGO by email
         appt_docs = list(db.collection("ngo_appointments")
             .where("ngoEmail", "==", payload.ngo_email)
             .where("status", "==", "scheduled")
             .order_by("scheduledDate", direction=firestore.Query.DESCENDING)
             .limit(1).stream())
 
+        # Extract current appointment details so the admin can see them in the review modal
+        current_appt = appt_docs[0].to_dict() if appt_docs else {}
+        current_appt_id = appt_docs[0].id if appt_docs else None
+        ngo_name_from_appt = current_appt.get("ngoName", "")
+        current_scheduled_date = current_appt.get("scheduledDate", "")
+        current_scheduled_time = current_appt.get("scheduledTime", "")
+
         db.collection("pending_reviews").add({
             "type": "ngo_appointment_change",
             "source": "ngo",
             "ngoEmail": payload.ngo_email,
-            "currentAppointmentId": appt_docs[0].id if appt_docs else None,
+            "ngoName": ngo_name_from_appt,
+            "currentAppointmentId": current_appt_id,
+            "currentScheduledDate": str(current_scheduled_date) if current_scheduled_date else "",
+            "currentScheduledTime": current_scheduled_time,
+            # preferred_date_1 may contain the pre-filled appointment ID from the form URL;
+            # actual NGO dates land in preferred_date_2 and preferred_date_3
             "preferredDate1": payload.preferred_date_1,
             "preferredDate2": payload.preferred_date_2,
+            "preferredDate3": payload.preferred_date_3,
             "message": payload.message,
             "reviewStatus": "pending",
-            "title": f"Appointment Change Request: {payload.ngo_email}",
+            "title": f"Appointment Change Request: {ngo_name_from_appt or payload.ngo_email}",
             "severity": "MEDIUM",
             "createdAt": firestore.SERVER_TIMESTAMP
         })
@@ -303,7 +337,7 @@ async def book_appointment(payload: BookAppointmentPayload, decoded_token: dict 
     change_url = (
         f"{NGO_RESCHEDULE_FORM_URL}"
         f"?{NGO_RESCHEDULE_FORM_EMAIL_ENTRY}={ngo_email or ''}"
-        f"&{NGO_RESCHEDULE_FORM_DATE_ENTRY}={appt_id}"
+        f"&{NGO_RESCHEDULE_FORM_DATE_ENTRY}={payload.scheduled_date}"
     )
     db.collection("ngo_appointments").document(appt_id).update({
         "changeFormUrl": change_url

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, onSnapshot, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase';
 import { useTx } from '../../context/TranslationContext';
 
@@ -36,6 +36,54 @@ export default function PendingReview() {
   const [adminNote, setAdminNote] = useState('');
   
   const formatDate = (d) => d ? new Date(d).toLocaleDateString() : '';
+
+  // Parse a date string in YYYY-MM-DD or DD/MM/YYYY or DD-MM-YYYY formats
+  const parseDate = (val) => {
+    if (!val || typeof val !== 'string') return null;
+    // Try YYYY-MM-DD (ISO)
+    let d = new Date(val);
+    if (!isNaN(d.getTime()) && val.includes('-') && val.length === 10) return d;
+    // Try DD/MM/YYYY or DD-MM-YYYY
+    const parts = val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (parts) {
+      const iso = `${parts[3]}-${parts[2].padStart(2,'0')}-${parts[1].padStart(2,'0')}`;
+      d = new Date(iso);
+      if (!isNaN(d.getTime())) return d;
+    }
+    // Last resort — try native parse (handles MM/DD/YYYY etc.)
+    d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  // Returns true if val is a parseable date AND not a Firestore doc ID
+  const isValidDate = (val) => {
+    if (!val || typeof val !== 'string') return false;
+    // Firestore doc IDs: 20 alphanumeric chars with no / or - separators
+    if (/^[A-Za-z0-9]{15,}$/.test(val)) return false;
+    return parseDate(val) !== null;
+  };
+
+  // Convert any valid date string to YYYY-MM-DD for <input type="date">
+  const parseToInputDate = (val) => {
+    const d = parseDate(val);
+    if (!d) return '';
+    return d.toISOString().split('T')[0];
+  };
+
+  // Human-readable display of any valid date string
+  const formatDisplayDate = (val) => {
+    const d = parseDate(val);
+    if (!d) return val; // fallback: show raw
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
+  const getPreferredDates = (rawData) => {
+    const dates = [rawData.preferredDate1, rawData.preferredDate2, rawData.preferredDate3, rawData.message].filter(isValidDate);
+    const currentIso = parseToInputDate(rawData.currentScheduledDate);
+    // Don't show the current scheduled date as a "preferred" date (it comes from the form prefill)
+    return dates.filter(d => parseToInputDate(d) !== currentIso);
+  };
+
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -109,6 +157,22 @@ export default function PendingReview() {
             console.warn('Error fetching', collName, e);
           }
         }));
+
+        // Enrich old ngo_appointment_change records with currentScheduledDate if missing
+        for (let r of allReviews) {
+          if (r.type === 'ngo_appointment_change' && !r.rawData.currentScheduledDate && r.rawData.currentAppointmentId) {
+            try {
+              const docSnap = await getDoc(doc(db, 'ngo_appointments', r.rawData.currentAppointmentId));
+              if (docSnap.exists()) {
+                const appt = docSnap.data();
+                r.rawData.currentScheduledDate = appt.scheduledDate || '';
+                r.rawData.currentScheduledTime = appt.scheduledTime || '';
+              }
+            } catch (e) {
+              console.error('Failed to fetch appointment date for review enrichment:', e);
+            }
+          }
+        }
 
         // Sort descending by date
         allReviews.sort((a, b) => {
@@ -376,8 +440,15 @@ export default function PendingReview() {
                             </span>
                             <h4 style={{margin:'8px 0 4px', fontSize:'15px'}}>{r.rawData.ngoName || r.rawData.ngoEmail}</h4>
                             <p style={{fontSize:'13px', color:'#666', margin:'0 0 4px'}}>
-                              Preferred Dates: {r.rawData.preferredDate1} {r.rawData.preferredDate2 ? ` or ${r.rawData.preferredDate2}` : ''}
-                            </p>
+                              {getPreferredDates(r.rawData).length > 0
+                                ? <>Preferred Dates: <strong>{getPreferredDates(r.rawData).map(d => formatDisplayDate(d)).join(' or ')}</strong></>
+                                : <span style={{color:'#aaa'}}>No preferred dates provided</span>}
+                             </p>
+                            {r.rawData.currentScheduledDate && (
+                              <p style={{fontSize:'13px', color:'#5D4037', margin:'0 0 4px', background:'#FFF8E1', padding:'4px 8px', borderRadius:'4px', display:'inline-block'}}>
+                                Current: <strong>{formatDisplayDate(r.rawData.currentScheduledDate)}</strong> {r.rawData.currentScheduledTime ? `at ${r.rawData.currentScheduledTime}` : ''}
+                              </p>
+                            )}
                             {r.rawData.message && (
                               <p style={{fontSize:'12px', color:'#888', fontStyle:'italic'}}>
                                 "{r.rawData.message}"
@@ -388,11 +459,35 @@ export default function PendingReview() {
                         </div>
                         <div style={{display:'flex', gap:'8px', marginTop:'12px'}}>
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               setSelectedRescheduleReview(r);
-                              setRescheduleDate(r.rawData.preferredDate1 || '');
+                              const validDates = getPreferredDates(r.rawData);
+                              setRescheduleDate(validDates.length > 0 ? parseToInputDate(validDates[0]) : '');
                               setRescheduleTime('10:00');
                               setShowRescheduleModal(true);
+
+                              // For older records, fetch the current appointment details dynamically
+                              if (!r.rawData.currentScheduledDate && r.rawData.currentAppointmentId) {
+                                try {
+                                  const docSnap = await getDoc(doc(db, 'ngo_appointments', r.rawData.currentAppointmentId));
+                                  if (docSnap.exists()) {
+                                    const appt = docSnap.data();
+                                    setSelectedRescheduleReview(prev => {
+                                      if (!prev || prev.id !== r.id) return prev;
+                                      return {
+                                        ...prev,
+                                        rawData: {
+                                          ...prev.rawData,
+                                          currentScheduledDate: appt.scheduledDate || '',
+                                          currentScheduledTime: appt.scheduledTime || ''
+                                        }
+                                      };
+                                    });
+                                  }
+                                } catch (e) {
+                                  console.error("Failed to fetch appointment date:", e);
+                                }
+                              }
                             }}
                             style={{flex:1, padding:'8px', background:'#2B5B84', color:'white',
                                     border:'none', borderRadius:'8px', fontSize:'13px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'}}
@@ -413,7 +508,9 @@ export default function PendingReview() {
                             </span>
                             <h4 style={{margin:'8px 0 4px', fontSize:'15px'}}>{r.rawData.ngoName || r.rawData.ngoEmail}</h4>
                             <p style={{fontSize:'13px', color:'#666', margin:'0 0 4px'}}>
-                              Preferred Dates: {r.rawData.preferredDate1} {r.rawData.preferredDate2 ? ` or ${r.rawData.preferredDate2}` : ''}
+                              {getPreferredDates(r.rawData).length > 0
+                                ? <>Preferred Dates: <strong>{getPreferredDates(r.rawData).map(d => formatDisplayDate(d)).join(' or ')}</strong></>
+                                : <span style={{color:'#aaa'}}>No preferred dates provided</span>}
                             </p>
                             {r.rawData.message && (
                               <p style={{fontSize:'12px', color:'#888', fontStyle:'italic'}}>
@@ -427,7 +524,7 @@ export default function PendingReview() {
                           <button
                             onClick={() => {
                               setSelectedAppointmentReview(r);
-                              setAppointmentDate(r.rawData.preferredDate1 || '');
+                              setAppointmentDate(getPreferredDates(r.rawData).length > 0 ? parseToInputDate(getPreferredDates(r.rawData)[0]) : '');
                               setAppointmentTime('10:00');
                               setShowAppointmentModal(true);
                             }}
@@ -600,6 +697,7 @@ export default function PendingReview() {
               <label style={{display:'block', fontSize:'13px', color:'#666', marginBottom:'4px'}}>Date</label>
               <input 
                 type="date" 
+                min={new Date().toISOString().split('T')[0]}
                 value={appointmentDate} 
                 onChange={e => setAppointmentDate(e.target.value)}
                 style={{width:'100%', padding:'8px', borderRadius:'8px', border:'1px solid #ddd'}}
@@ -686,35 +784,50 @@ export default function PendingReview() {
               <span className="material-symbols-outlined">edit_calendar</span> Reschedule Appointment
             </h3>
             
+            {/* Current scheduled date */}
+            {selectedRescheduleReview.rawData.currentScheduledDate ? (
+              <div style={{background:'#FFF8E1', border:'1px solid #FDD835', borderRadius:'8px', padding:'10px 14px', fontSize:'13px', color:'#5D4037'}}>
+                <span style={{fontWeight:600}}>Current appointment:</span>{' '}
+                {formatDisplayDate(selectedRescheduleReview.rawData.currentScheduledDate)}
+                {selectedRescheduleReview.rawData.currentScheduledTime ? ` at ${selectedRescheduleReview.rawData.currentScheduledTime}` : ''}
+              </div>
+            ) : null}
+
+            {/* NGO preferred dates */}
             <p style={{fontSize:'14px', color:'#333', margin:0}}>
-              NGO requested: <strong>{selectedRescheduleReview.rawData.preferredDate1}</strong> 
-              {selectedRescheduleReview.rawData.preferredDate2 ? <span> or <strong>{selectedRescheduleReview.rawData.preferredDate2}</strong></span> : null}
+              {(() => {
+                const dates = getPreferredDates(selectedRescheduleReview.rawData);
+                return dates.length > 0
+                  ? <>NGO requested: <strong>{dates.map(d => formatDisplayDate(d)).join(' or ')}</strong></>
+                  : <span style={{color:'#888'}}>NGO did not specify preferred dates.</span>;
+              })()}
             </p>
 
-            <div>
-              <label style={{display:'block', fontSize:'13px', color:'#666', marginBottom:'4px'}}>Confirm new date:</label>
-              <div style={{display:'flex', gap:'8px'}}>
-                <button
-                  onClick={() => setRescheduleDate(selectedRescheduleReview.rawData.preferredDate1)}
-                  style={{flex:1, padding:'10px', border: rescheduleDate===selectedRescheduleReview.rawData.preferredDate1 ? '2px solid #1D9E75' : '1px solid #ddd', borderRadius:'8px', background:'white', cursor:'pointer'}}
-                >
-                  {formatDate(selectedRescheduleReview.rawData.preferredDate1)}
-                </button>
-                {selectedRescheduleReview.rawData.preferredDate2 && (
-                  <button
-                    onClick={() => setRescheduleDate(selectedRescheduleReview.rawData.preferredDate2)}
-                    style={{flex:1, padding:'10px', border: rescheduleDate===selectedRescheduleReview.rawData.preferredDate2 ? '2px solid #1D9E75' : '1px solid #ddd', borderRadius:'8px', background:'white', cursor:'pointer'}}
-                  >
-                    {formatDate(selectedRescheduleReview.rawData.preferredDate2)}
-                  </button>
-                )}
-              </div>
-            </div>
+            {(() => {
+              const dates = getPreferredDates(selectedRescheduleReview.rawData);
+              return dates.length > 0 ? (
+                <div>
+                  <label style={{display:'block', fontSize:'13px', color:'#666', marginBottom:'4px'}}>Confirm new date:</label>
+                  <div style={{display:'flex', gap:'8px'}}>
+                    {dates.map(d => (
+                      <button
+                        key={d}
+                        onClick={() => setRescheduleDate(parseToInputDate(d))}
+                        style={{flex:1, padding:'10px', border: rescheduleDate===parseToInputDate(d) ? '2px solid #1D9E75' : '1px solid #ddd', borderRadius:'8px', background: rescheduleDate===parseToInputDate(d) ? '#f0fdf4' : 'white', cursor:'pointer', fontWeight: rescheduleDate===parseToInputDate(d) ? 600 : 400}}
+                      >
+                        {formatDisplayDate(d)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
 
             <div>
               <label style={{display:'block', fontSize:'13px', color:'#666', marginBottom:'4px'}}>Or pick a different date:</label>
               <input 
                 type="date" 
+                min={new Date().toISOString().split('T')[0]}
                 value={rescheduleDate} 
                 onChange={e => setRescheduleDate(e.target.value)}
                 style={{width:'100%', padding:'8px', borderRadius:'8px', border:'1px solid #ddd'}}
