@@ -76,6 +76,26 @@
       "collectionGroup": "household_members",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "aadhaarLast4", "order": "ASCENDING" },
+        { "fieldPath": "ashaId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ngo_appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ashaId", "order": "ASCENDING" },
+        { "fieldPath": "scheduledDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ngo_appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ashaId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "scheduledDate", "order": "ASCENDING" }
+      ]
     },
     {
       "collectionGroup": "appointments",
@@ -92,6 +112,39 @@
         { "fieldPath": "ashaId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "scheduledDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pending_reviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "source", "order": "ASCENDING" },
+        { "fieldPath": "reviewStatus", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ngo_appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ngoId", "order": "ASCENDING" },
+        { "fieldPath": "scheduledDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ngo_appointments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ngoEmail", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "scheduledDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ngos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "email", "order": "ASCENDING" }
       ]
     }
   ],

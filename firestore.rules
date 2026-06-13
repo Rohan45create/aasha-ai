@@ -214,5 +214,21 @@ service cloud.firestore {
       allow update: if isAuthenticated();
       allow delete: if false;
     }
+
+    // ==========================================
+    // NGO ACCOUNTS & APPOINTMENTS
+    // ==========================================
+
+    match /ngos/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    match /ngo_appointments/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if false;
+    }
   }
 }
