@@ -3,8 +3,11 @@ from datetime import datetime
 from firebase_admin import firestore, messaging
 from middleware.auth_middleware import verify_firebase_token
 import os
+import structlog
 from pydantic import BaseModel
 from typing import Optional, List
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/ngo", tags=["NGO Integration"])
 public_router = APIRouter(prefix="/api/ngo", tags=["NGO Integration Public"])
@@ -268,10 +271,19 @@ async def book_appointment(payload: BookAppointmentPayload, decoded_token: dict 
         asha_docs = db.collection("ashas").where("supervisorId", "==", payload.head_id).stream()
         asha_ids = [d.id for d in asha_docs]
 
+    ngo_doc = db.collection("ngos").document(payload.ngo_id).get()
+    if not ngo_doc.exists:
+        raise HTTPException(status_code=404, detail="NGO not found")
+    ngo_data = ngo_doc.to_dict()
+    ngo_email = ngo_data.get("email")
+
+    if not ngo_email:
+        logger.warning("ngo_missing_email", ngo_id=payload.ngo_id, ngo_name=payload.ngo_name)
+
     # Create ngo_appointments document
     appt_doc = {
         "ngoId": payload.ngo_id,
-        "ngoEmail": payload.ngo_email,
+        "ngoEmail": ngo_email or "",
         "ngoName": payload.ngo_name,
         "scheduledDate": payload.scheduled_date,
         "scheduledTime": payload.scheduled_time,
@@ -290,14 +302,36 @@ async def book_appointment(payload: BookAppointmentPayload, decoded_token: dict 
 
     change_url = (
         f"{NGO_RESCHEDULE_FORM_URL}"
-        f"?{NGO_RESCHEDULE_FORM_EMAIL_ENTRY}={payload.ngo_email}"
+        f"?{NGO_RESCHEDULE_FORM_EMAIL_ENTRY}={ngo_email or ''}"
         f"&{NGO_RESCHEDULE_FORM_DATE_ENTRY}={appt_id}"
     )
     db.collection("ngo_appointments").document(appt_id).update({
         "changeFormUrl": change_url
     })
     
-    # TODO: integrate Gmail API or SendGrid
+    from services.email_service import send_email, build_appointment_email
+
+    email_html = build_appointment_email(
+        ngo_name=payload.ngo_name,
+        scheduled_date=payload.scheduled_date,
+        scheduled_time=payload.scheduled_time,
+        purpose=payload.purpose,
+        change_url=change_url
+    )
+    
+    logger.info("attempting_ngo_email", to=ngo_email, ngo_id=payload.ngo_id, configured=bool(os.getenv("GMAIL_SENDER_EMAIL")))
+    
+    email_sent = False
+    if ngo_email:
+        email_sent = send_email(
+            to_email=ngo_email,
+            subject=f"Visit Scheduled — {payload.ngo_name}",
+            html_body=email_html
+        )
+
+    db.collection("ngo_appointments").document(appt_id).update({
+        "emailSent": email_sent
+    })
     
     # For FCM to ASHA workers
     for asha_id in asha_ids:
@@ -379,6 +413,21 @@ async def update_appointment_date(appointment_id: str, payload: UpdateDatePayloa
             "createdAt": firestore.SERVER_TIMESTAMP,
             "linkedAppointmentId": appointment_id
         })
+        
+    from services.email_service import send_email, build_reschedule_confirmation_email
+
+    confirmation_html = build_reschedule_confirmation_email(
+        ngo_name=ngo.get("name", "your organization"),
+        new_date=payload.new_date,
+        new_time=payload.new_time
+    )
+    ngo_email = appt.get("ngoEmail")
+    if ngo_email:
+        send_email(
+            to_email=ngo_email,
+            subject=f"Appointment Confirmed — {ngo.get('name', 'AshaAI Visit')}",
+            html_body=confirmation_html
+        )
         
     return {"success": True}
 

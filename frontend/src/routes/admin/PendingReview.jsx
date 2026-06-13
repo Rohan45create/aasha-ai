@@ -188,7 +188,7 @@ export default function PendingReview() {
   const handleApproveNGO = async (reviewId) => {
     try {
       const token = await auth.currentUser.getIdToken();
-      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/ngo/approve-registration/${reviewId}`, {
+      await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/ngo/approve-registration/${reviewId}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -216,7 +216,7 @@ export default function PendingReview() {
   const handleBookAppointment = async () => {
     try {
       const token = await auth.currentUser.getIdToken();
-      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/ngo/book-appointment`, {
+      await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/ngo/book-appointment`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -249,7 +249,7 @@ export default function PendingReview() {
   const handleConfirmReschedule = async () => {
     try {
       const token = await auth.currentUser.getIdToken();
-      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/ngo/appointment/${selectedRescheduleReview.rawData.currentAppointmentId}/update-date`, {
+      await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/ngo/appointment/${selectedRescheduleReview.rawData.currentAppointmentId}/update-date`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -748,6 +748,16 @@ export default function PendingReview() {
                         border:'none', borderRadius:'8px', fontSize:'14px', cursor:'pointer'}}
               >
                 Confirm New Date
+              </button>
+              <button
+                onClick={() => {
+                  handleRejectReview(selectedRescheduleReview.originalId, "Reschedule request declined");
+                  setShowRescheduleModal(false);
+                }}
+                style={{flex:1, padding:'10px', background:'white', color:'#E24B4A',
+                        border:'1px solid #E24B4A', borderRadius:'8px', fontSize:'14px', cursor:'pointer'}}
+              >
+                Reject
               </button>
               <button
                 onClick={() => setShowRescheduleModal(false)}
