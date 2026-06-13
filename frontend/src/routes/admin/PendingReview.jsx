@@ -497,7 +497,7 @@ export default function PendingReview() {
                         </div>
                       </div>
                     );
-                  } else if (r.type === 'ngo_appointment') {
+                  } else if (r.type === 'ngo_book_appointment' || r.type === 'ngo_appointment') {
                     return (
                       <div key={r.id} style={{border:'1px solid #CECBF6', borderRadius:'12px', padding:'16px', background:'white'}}>
                         <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
@@ -647,14 +647,29 @@ export default function PendingReview() {
               {/* Action Buttons */}
               <div className="pt-4 border-t border-[#D3D1C7] flex-shrink-0 bg-white">
                 <div className="flex gap-3 mb-3">
-                  <button
-                    onClick={handleApprove}
-                    disabled={processing}
-                    className="flex-1 bg-[#1D9E75] text-white py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-[#085041] transition-colors disabled:opacity-50 text-sm"
-                  >
-                    <span className="material-symbols-outlined text-lg">check</span>
-                    {tx('Approve', 'approve')}
-                  </button>
+                  {(selectedReview.type === 'ngo_book_appointment' || selectedReview.type === 'ngo_appointment') ? (
+                    <button
+                      onClick={() => {
+                        setSelectedAppointmentReview(selectedReview);
+                        setAppointmentDate(getPreferredDates(selectedReview.rawData).length > 0 ? parseToInputDate(getPreferredDates(selectedReview.rawData)[0]) : '');
+                        setAppointmentTime('10:00');
+                        setShowAppointmentModal(true);
+                      }}
+                      className="flex-1 bg-[#2B5B84] text-white py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-[#1C4162] transition-colors text-sm"
+                    >
+                      <span className="material-symbols-outlined text-lg">calendar_today</span>
+                      Book Appointment
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleApprove}
+                      disabled={processing}
+                      className="flex-1 bg-[#1D9E75] text-white py-2.5 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-[#085041] transition-colors disabled:opacity-50 text-sm"
+                    >
+                      <span className="material-symbols-outlined text-lg">check</span>
+                      {tx('Approve', 'approve')}
+                    </button>
+                  )}
                   <button
                     onClick={() => setProcessing(!processing)}
                     disabled={processing}
