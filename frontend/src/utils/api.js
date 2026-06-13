@@ -1,5 +1,4 @@
 import { auth } from '../firebase';
-import { useAuthStore } from '../stores/authStore';
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
@@ -67,7 +66,7 @@ export const apiFetch = async (endpoint, options = {}) => {
     }
 
     if (errorCode === 'PROFILE_NOT_FOUND') {
-      useAuthStore.getState().logout();
+      window.dispatchEvent(new Event('auth:logout'));
       showToast("Account not found. Please contact your supervisor.", "error");
     }
 

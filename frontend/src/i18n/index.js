@@ -16,7 +16,8 @@ i18n
     },
     lng: storedLang,
     fallbackLng: 'en',
-    interpolation: { escapeValue: false }
+    interpolation: { escapeValue: false },
+    react: { useSuspense: false }
   });
 
 export default i18n;
