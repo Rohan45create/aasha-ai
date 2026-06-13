@@ -21,6 +21,8 @@ jobs:
           npm run build
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL_PROD }}
+          VITE_NGO_FORM_NEW: ${{ secrets.VITE_NGO_FORM_NEW }}
+          VITE_NGO_FORM_EXISTING: ${{ secrets.VITE_NGO_FORM_EXISTING }}
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
