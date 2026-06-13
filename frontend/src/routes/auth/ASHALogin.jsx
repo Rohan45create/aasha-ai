@@ -4,8 +4,21 @@ import { auth } from '../../firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { useTranslation } from 'react-i18next';
 import LanguageToggle from '../../components/LanguageToggle';
+import toast from 'react-hot-toast';
+
+// NGO form URLs come from frontend/.env.local (VITE_NGO_FORM_NEW, VITE_NGO_FORM_EXISTING)
+// See frontend/.env.example
 
 export default function ASHALogin() {
+  const ngoFormNewUrl = import.meta.env.VITE_NGO_FORM_NEW || '#';
+  
+  const handleNgoClick = () => {
+    if (ngoFormNewUrl === '#') {
+      toast.error('NGO form not configured. Contact admin.')
+      return
+    }
+    window.open(ngoFormNewUrl, '_blank')
+  };
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [step, setStep] = useState(1); // 1: phone, 2: otp
@@ -157,6 +170,30 @@ export default function ASHALogin() {
             >
               Go to Admin Portal
             </button>
+
+            <button
+              onClick={handleNgoClick}
+              style={{
+                width: '100%',
+                padding: '12px',
+                marginTop: '8px',
+                border: '1px solid #1D9E75',
+                borderRadius: '8px',
+                background: 'white',
+                color: '#1D9E75',
+                fontSize: '14px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>domain</span> NGO / Orphanage Portal
+            </button>
+            <p style={{textAlign:'center', fontSize:'12px', color:'#888', marginTop:'8px'}}>
+              Register your NGO or manage existing appointments
+            </p>
           </div>
         </div>
       </div>
