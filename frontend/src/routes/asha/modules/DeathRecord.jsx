@@ -24,8 +24,7 @@ export default function DeathRecord() {
       collectionName="death_records"
       moduleName="death_record"
       fields={fields}
-      aadhaarPersonLabel="Deceased / à¤®à¥ƒà¤¤ à¤µà¥�à¤¯à¤•à¥�à¤¤à¥€"
+      aadhaarPersonLabel="Deceased / मृत व्यक्ती"
     />
   );
 }
-

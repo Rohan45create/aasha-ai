@@ -39,12 +39,12 @@ const FIELDS = [
 
 export default function Vaccination() {
   return <BaseModuleForm 
-    title="Vaccination / à¤²à¤¸à¥€à¤•à¤°à¤£" 
+    title="Vaccination / लसीकरण" 
     moduleIcon="vaccines" 
     collectionName="vaccinations"
     moduleName="vaccination"
     fields={FIELDS}
-    aadhaarPersonLabel="Child / à¤¬à¤¾à¤²à¤•"
+    aadhaarPersonLabel="Child / बालक"
   />;
 }
 

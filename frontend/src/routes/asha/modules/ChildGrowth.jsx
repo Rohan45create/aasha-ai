@@ -11,11 +11,11 @@ import AadhaarLinkagePopup from '../../../components/AadhaarLinkagePopup';
 import { apiFetch } from '../../../utils/api';
 
 const FIELDS = [
-  { id: 'child_name', label: 'Child Name / à¤¬à¤¾à¤²à¤•à¤¾à¤šà¥‡ à¤¨à¤¾à¤µ', required: true, placeholder: 'Full name' },
+  { id: 'child_name', label: 'Child Name / बालकाचे नाव', required: true, placeholder: 'Full name' },
   { id: 'mother_name', label: 'Mother Name', required: true },
   { id: 'age_months', label: 'Age (months)', type: 'number', required: true, placeholder: '0-60' },
   { id: 'gender', label: 'Gender', type: 'select', required: true, options: [
-    { value: 'Male', label: 'Male / à¤®à¥�à¤²à¤—à¤¾' }, { value: 'Female', label: 'Female / à¤®à¥�à¤²à¤—à¥€' }
+    { value: 'Male', label: 'Male / मुलगा' }, { value: 'Female', label: 'Female / मुलगी' }
   ]},
   { id: 'weight_kg', label: 'Weight (kg)', type: 'number', required: true, placeholder: 'e.g. 8.5' },
   { id: 'height_cm', label: 'Height (cm)', type: 'number', required: true, placeholder: 'e.g. 72' },
@@ -428,14 +428,14 @@ export default function ChildGrowth() {
 
       {/* â”€â”€ Regular Form â”€â”€ */}
       <BaseModuleForm
-        title="Child Growth / à¤¬à¤¾à¤² à¤µà¤¾à¤¢"
+        title="Child Growth / बाल वाढ"
         moduleIcon="child_care"
         collectionName="children"
         moduleName="child_growth"
         fields={FIELDS}
         onFormChange={setPrefillData}
         showAadhaar={hasParents}
-        aadhaarPersonLabel="Child / à¤¬à¤¾à¤²à¤•"
+        aadhaarPersonLabel="Child / बालक"
         onAadhaarScanned={handleAadhaarEntered}
         afterSubmit={handleAfterSubmit}
         extraData={{

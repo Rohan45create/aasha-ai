@@ -32,8 +32,7 @@ export default function FamilyPlanning() {
       collectionName="family_planning"
       moduleName="family_planning"
       fields={fields}
-      aadhaarPersonLabel="Beneficiary / à¤²à¤¾à¤­à¤¾à¤°à¥�à¤¥à¥€"
+      aadhaarPersonLabel="Beneficiary / लाभार्थी"
     />
   );
 }
-
