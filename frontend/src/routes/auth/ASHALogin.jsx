@@ -11,13 +11,15 @@ import toast from 'react-hot-toast';
 
 export default function ASHALogin() {
   const ngoFormNewUrl = import.meta.env.VITE_NGO_FORM_NEW || '#';
-  
-  const handleNgoClick = () => {
-    if (ngoFormNewUrl === '#') {
+  const ngoFormExistingUrl = import.meta.env.VITE_NGO_FORM_EXISTING || '#';
+
+  const handleNgoAction = (url) => {
+    if (url === '#') {
       toast.error('NGO form not configured. Contact admin.')
       return
     }
-    window.open(ngoFormNewUrl, '_blank')
+    window.open(url, '_blank')
+    setShowNGOModal(false);
   };
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
@@ -26,6 +28,7 @@ export default function ASHALogin() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const [showNGOModal, setShowNGOModal] = useState(false);
 
 
   const setupRecaptcha = () => {
@@ -73,7 +76,7 @@ export default function ASHALogin() {
     try {
       const result = await window.confirmationResult.confirm(otp);
       const user = result.user;
-      
+
       const { useAuthStore } = await import('../../stores/authStore');
       await useAuthStore.getState().handleFirebaseLogin(user, navigate);
     } catch (err) {
@@ -102,7 +105,7 @@ export default function ASHALogin() {
             {t('login')}
           </h2>
 
-            <div className="mt-6 bg-[#EAF3DE] border border-[#1D9E75] rounded-xl p-4">
+          <div className="mt-6 bg-[#EAF3DE] border border-[#1D9E75] rounded-xl p-4">
             <p className="text-xs font-bold text-[#27500A] mb-2"><span className="material-symbols-outlined text-[16px] align-middle mr-1">key</span> Demo Credentials</p>
             <p className="text-xs text-[#27500A] font-mono">Phone Number: 9876543211</p>
             <p className="text-xs text-[#27500A] font-mono mt-1">OTP: 123456</p>
@@ -172,7 +175,7 @@ export default function ASHALogin() {
             </button>
 
             <button
-              onClick={handleNgoClick}
+              onClick={() => setShowNGOModal(true)}
               style={{
                 width: '100%',
                 padding: '12px',
@@ -191,12 +194,59 @@ export default function ASHALogin() {
             >
               <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>domain</span> NGO / Orphanage Portal
             </button>
-            <p style={{textAlign:'center', fontSize:'12px', color:'#888', marginTop:'8px'}}>
+            <p style={{ textAlign: 'center', fontSize: '12px', color: '#888', marginTop: '8px' }}>
               Register your NGO or manage existing appointments
             </p>
           </div>
         </div>
       </div>
+
+      {showNGOModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+        }}>
+          <div style={{
+            background: 'white', borderRadius: '16px', padding: '24px',
+            width: '320px', display: 'flex', flexDirection: 'column', gap: '12px'
+          }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: '#1A1A18' }}>NGO Portal</h3>
+            <p style={{ fontSize: '13px', color: '#666', margin: 0 }}>
+              Are you registering a new NGO or managing an existing one?
+            </p>
+
+            <button
+              onClick={() => handleNgoAction(ngoFormNewUrl)}
+              style={{
+                padding: '12px', background: '#1D9E75', color: 'white', border: 'none',
+                borderRadius: '8px', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>add_circle</span> Register New NGO
+            </button>
+
+            <button
+              onClick={() => handleNgoAction(ngoFormExistingUrl)}
+              style={{
+                padding: '12px', background: 'white', color: '#1D9E75',
+                border: '1px solid #1D9E75', borderRadius: '8px', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>check_circle</span> Already Registered NGO
+            </button>
+
+            <button
+              onClick={() => setShowNGOModal(false)}
+              style={{
+                padding: '8px', background: 'none', border: 'none',
+                color: '#888', fontSize: '13px', cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
