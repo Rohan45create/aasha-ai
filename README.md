@@ -14,7 +14,7 @@ A **Google Solution Challenge 2026** Project — Selected in the **Global Top 10
 
 ## Intro To AshaAI Video
 
-[![Intro To AshaAI](YOUR_YOUTUBE_THUMBNAIL_URL_HERE)
+[![Intro To AshaAI](https://res.cloudinary.com/drb4gctam/image/upload/v1781529813/Empowering_ASHAs_Elevating_Healthcare_lcpftv.png)
 ](YOUR_YOUTUBE_VIDEO_LINK_HERE)
 
 A short walkthrough of AshaAI's voice-first, offline-first health platform for ASHA workers. Click the image above to watch the video.
@@ -23,11 +23,12 @@ A short walkthrough of AshaAI's voice-first, offline-first health platform for A
 
 <p align="center">
   <img src="https://res.cloudinary.com/drb4gctam/image/upload/v1781363044/E_PRINT_03_hnvufu.jpg" width="200"/>
-  <img src="https://res.cloudinary.com/drb4gctam/image/upload/v1781363205/E_PRINT_09_vmaqk2.jpg" width="200"/>
   <img src="https://res.cloudinary.com/drb4gctam/image/upload/v1781362667/E_PRINT_10_xruhrt.jpg" width="200"/>
+  <img src="https://res.cloudinary.com/drb4gctam/image/upload/v1781519319/E_PRINT_17_k36bty.jpg" width="200"/>
 </p>
 
-AshaAI enables early detection of high-risk maternal and child health cases through AI-powered insights and real-time monitoring, directly supporting SDG 3 — Good Health and Well-being. Its offline-first architecture, voice-first multilingual interface, and Gemini-powered AI pipeline bring resilient digital health infrastructure to villages with little to no connectivity — advancing SDG 9 — Industry, Innovation and Infrastructure by making cutting-edge AI tools accessible at the last mile. And its new NGO & Orphanage Integration module connects orphaned and vulnerable children with coordinated health visits and welfare support — directly advancing SDG 10 — Reduced Inequalities by ensuring no child falls through the cracks of the healthcare system, regardless of where they live or who cares for them.
+AshaAI enables early detection of high-risk maternal and child health cases through AI-powered insights and real-time monitoring, directly supporting 
+<ins>**SDG 3 — Good Health and Well-being**</ins>. Its new NGO & Orphanage Integration module ensures equitable healthcare access for every child — connecting orphaned and vulnerable children with coordinated health visits and welfare support, regardless of where they live or who cares for them — advancing <ins>**SDG 10 — Reduced Inequalities**</ins>. And by building a seamless digital bridge between frontline ASHA workers, government health supervisors, and NGOs/orphanages — automating registration, scheduling, and communication that previously required manual coordination — AshaAI fosters the kind of cross-sector collaboration needed to deliver healthcare at scale, advancing <ins>**SDG 17 — Partnerships for the Goals**</ins>.
 
 ## 💯 Project Achievements
 
@@ -81,9 +82,27 @@ AshaAI enables early detection of high-risk maternal and child health cases thro
   <i>🌟 <b>And countless more...</b> Beyond these global figures, ASHA workers receive daily recognition from state health ministries, local NGOs, and the millions of rural families whose lives they touch. Their impact goes far beyond what can be captured in a single table, driving our commitment to build tools that genuinely support their groundwork.</i>
 </p>
 
+## 📚 Technical Architecture & Documentation
+
+Want to dive deeper into how **AshaAI** works under the hood? We have compiled a comprehensive technical document that covers everything from our core algorithms to our database structure.
+
+**Inside the document, you will find:**
+* ⚙️ **Complete Tech Stack:** Detailed breakdown of frontend, backend, and database technologies.
+* 🧠 **Algorithms & Logic:** How our data syncing, offline support, and orphan-flagging systems operate.
+* 🏗️ **System Architecture:** How the ASHA worker module communicates with the NGO network.
+* 🚀 **Implementation Guide:** Step-by-step insights into how we built and scaled the application.
+
+<br>
+
+<p align="center">
+  <a href="https://drive.google.com/file/d/1z8rv3p6vAUzPKhGIpnf9wki-_R4Bv7rg/view?usp=sharing" target="_blank">
+    <img src="https://img.shields.io/badge/📄_View_Full_Project_Documentation-0052CC?style=for-the-badge&logo=googledrive&logoColor=white" alt="View Documentation Button" />
+  </a>
+</p>
+
 ## ⚙️ Local Development Setup
 
-Follow these steps to run AshaAI locally. For full cloud infrastructure setup (GCP, Cloud Functions, Firestore, etc.), refer to the [Complete Setup Guide](./ashaai-docs/SETUP_GUIDE_COMPLETE.md).
+Follow these steps to run AshaAI locally. For full cloud infrastructure setup (GCP, Cloud Functions, Firestore, etc.), refer to the [Complete Setup Guide](https://drive.google.com/file/d/1z8rv3p6vAUzPKhGIpnf9wki-_R4Bv7rg/view?usp=sharing).
 
 ### 1. Prerequisites
 - Node.js (v20+ or v22+)
