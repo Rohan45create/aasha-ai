@@ -14,8 +14,7 @@ A **Google Solution Challenge 2026** Project — Selected in the **Global Top 10
 
 ## Intro To AshaAI Video
 
-[![Intro To AshaAI](https://res.cloudinary.com/drb4gctam/image/upload/v1781529813/Empowering_ASHAs_Elevating_Healthcare_lcpftv.png)
-](YOUR_YOUTUBE_VIDEO_LINK_HERE)
+[![Intro To AshaAI](https://res.cloudinary.com/drb4gctam/image/upload/v1781581550/Empowering_ASHAs_Elevating_Healthcare_1_pe40sk.png)](https://youtu.be/ZbqG6uUldfI?si=LarbruBTeVuaWRxU)
 
 A short walkthrough of AshaAI's voice-first, offline-first health platform for ASHA workers. Click the image above to watch the video.
 
@@ -513,7 +512,7 @@ These shaped AshaAI's data model, module list, and feature priorities.
 
 ## 🤝 Contributors
 
-We are a team of Computer Engineering students from Maharashtra, building AshaAI as part of the **Google Solution Challenge 2026**, under the **Build with AI** track organized by Hack2Skill and Google Developer Groups.
+We are a team of Computer Engineering students from [Maharashtra Institute of Technology](https://www.linkedin.com/school/mit-csn/posts/?feedView=all), Chhatrapati Sambhajinagar, Maharashtra, building AshaAI as part of the **Google Solution Challenge 2026**, under the **Build with AI** track organized by Hack2Skill and Google Developer Groups.
 
 | [Rohan Gangawane](https://www.linkedin.com/in/rohan-gangawane/) | [Akshay Chaudhari](https://www.linkedin.com/in/akshay-chaudhari-31b4b4264/) | [Sakshi Bhutekar](https://www.linkedin.com/in/sakshi-bhutekar-3009572ba/) | [Pratik Bhosale](https://www.linkedin.com/in/pratik-bhosale-756489318/) |
 | -------------------------------------- | ---------------------------------- | ---------------------------------- | ---------------------------------- |
