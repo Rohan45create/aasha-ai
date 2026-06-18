@@ -7,7 +7,6 @@ import structlog
 logger = structlog.get_logger()
 
 MODEL_NAME = "gemini-2.5-flash"
-_gemini_model = GenerativeModel(MODEL_NAME)
 
 VOICE_PROMPTS = {
     "family_survey": """Extract family member data from this Marathi/Hindi/English transcript.
@@ -241,7 +240,7 @@ ASHA worker's spoken text:
 Return ONLY valid JSON. No explanation."""
 
         try:
-            response = _gemini_model.generate_content(
+            response = GenerativeModel(MODEL_NAME).generate_content(
                 full_prompt,
                 generation_config={"response_mime_type": "application/json"},
             )
@@ -301,7 +300,7 @@ If the image is too unclear, blurry, or does not show a child, return grade "NOR
 
         try:
             image_part = Part.from_data(data=image_bytes, mime_type=mime_type)
-            response = _gemini_model.generate_content(
+            response = GenerativeModel(MODEL_NAME).generate_content(
                 [prompt, image_part],
                 generation_config={"response_mime_type": "application/json"},
             )
@@ -348,7 +347,7 @@ If the image is too unclear, blurry, or does not show a child, return grade "NOR
 
         try:
             image_part = Part.from_data(data=image_bytes, mime_type=mime_type)
-            response = _gemini_model.generate_content(
+            response = GenerativeModel(MODEL_NAME).generate_content(
                 [prompt, image_part],
                 generation_config={"response_mime_type": "application/json"},
             )
@@ -399,7 +398,7 @@ Return ONLY valid JSON:
 }}"""
 
         try:
-            response = _gemini_model.generate_content(
+            response = GenerativeModel(MODEL_NAME).generate_content(
                 prompt,
                 generation_config={"response_mime_type": "application/json"},
             )
@@ -442,7 +441,7 @@ Return ONLY valid JSON:
 }}"""
 
         try:
-            response = _gemini_model.generate_content(
+            response = GenerativeModel(MODEL_NAME).generate_content(
                 prompt,
                 generation_config={"response_mime_type": "application/json"},
             )

@@ -9,7 +9,7 @@ from services.gemini_service import GeminiService
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/vision", tags=["Vision & OCR"])
 
-STORAGE_BUCKET = os.getenv("GCS_BUCKET", "ashaai-health-photos")
+STORAGE_BUCKET = os.getenv("GCS_BUCKET", "ashaai-backend-photos")
 
 
 from middleware.auth_middleware import verify_firebase_token

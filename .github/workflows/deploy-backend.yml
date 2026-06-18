@@ -22,6 +22,10 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Create Vertex AI Credentials
+        run: |
+          echo '${{ secrets.VERTEX_AI_CREDENTIALS_JSON }}' > backend/google-service-account.json
+
       - name: Deploy to Cloud Run
         env:
           ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
