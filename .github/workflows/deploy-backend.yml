@@ -30,7 +30,7 @@ jobs:
 
       - name: Deploy to Cloud Run
         env:
-          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+          ALLOWED_ORIGINS: 'https://ashaai-prod.web.app,http://localhost:5173,http://localhost:4173'
           REDIS_URL: ${{ secrets.REDIS_URL }}
           GOOGLE_FORM_SECRET: ${{ secrets.GOOGLE_FORM_SECRET }}
           NGO_RESCHEDULE_FORM_URL: ${{ secrets.NGO_RESCHEDULE_FORM_URL }}
