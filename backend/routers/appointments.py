@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Body, HTTPException
 from typing import Optional
 from datetime import datetime
-from google.cloud import firestore
+from firebase_admin import firestore
 import structlog
 from middleware.auth_middleware import verify_firebase_token
 
@@ -14,7 +14,7 @@ async def schedule_appointment(
     user=Depends(verify_firebase_token)
 ):
     try:
-        db = firestore.Client()
+        db = firestore.client()
         
         appointment_data = {
             "ashaId": payload.get("ashaId"),
@@ -45,7 +45,7 @@ async def schedule_appointment(
 @router.get("/upcoming/{asha_id}")
 async def get_upcoming_appointments(asha_id: str, user=Depends(verify_firebase_token)):
     try:
-        db = firestore.Client()
+        db = firestore.client()
         today = datetime.now().strftime("%Y-%m-%d")
         
         docs = db.collection("appointments") \
@@ -115,7 +115,7 @@ async def complete_appointment(
     user=Depends(verify_firebase_token)
 ):
     try:
-        db = firestore.Client()
+        db = firestore.client()
         collection_name = "ngo_appointments" if payload.get("type") == "ngo" else "appointments"
         db.collection(collection_name).document(appointment_id).update({
             "status": "completed",

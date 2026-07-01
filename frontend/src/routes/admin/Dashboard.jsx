@@ -186,38 +186,7 @@ export default function AdminDashboard() {
           return;
         }
 
-        // Note: Firestore 'in' queries support max 30 items. Since we have 5 ASHAs this is fine.
-        
-        // Critical Cases
-        const criticalSnap = await getDocs(
-          query(collection(db, 'children'), where('ashaId', 'in', ashaIds), where('riskLevel', '==', 'CRITICAL'))
-        );
-        
-        // Total Families
-        const familiesSnap = await getDocs(
-          query(collection(db, 'households'), where('ashaId', 'in', ashaIds))
-        );
-
-        // Active Today (Fix: proper Firestore Timestamp)
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const todayStartTs = Timestamp.fromDate(todayStart);
-        
-        const activeSnap = await getDocs(
-          query(collection(db, 'module_submissions'), where('ashaId', 'in', ashaIds), where('submittedAt', '>=', todayStartTs))
-        );
-        
-        const activeAshaIds = new Set();
-        activeSnap.forEach(d => activeAshaIds.add(d.data().ashaId));
-
-        // Pending reviews
-        const pendingSnap = await getDocs(query(collection(db, 'pending_reviews'), where('reviewStatus', '==', 'pending')));
-
-        // ------------------
-        // CHART DATA BUILDER
-        // ------------------
-        
-        // 1. Risk Chart (all 4 levels)
+        // 1. Fetch all children to build Risk Chart and Critical Cases count
         const allChildrenSnap = await getDocs(
           query(collection(db, 'children'), where('ashaId', 'in', ashaIds))
         );
@@ -227,24 +196,44 @@ export default function AdminDashboard() {
           if (rCounts[risk] !== undefined) rCounts[risk]++;
         });
         
-        // 2. Module & Worker Charts (fetch recent submissions)
+        // Total Families (Single field query)
+        const familiesSnap = await getDocs(
+          query(collection(db, 'households'), where('ashaId', 'in', ashaIds))
+        );
+
+        // Pending reviews (Single field query)
+        const pendingSnap = await getDocs(query(collection(db, 'pending_reviews'), where('reviewStatus', '==', 'pending')));
+
+        // 2. Module & Worker Charts, and Active Today (fetch all recent submissions)
         const allSubsSnap = await getDocs(
           query(collection(db, 'module_submissions'), where('ashaId', 'in', ashaIds))
         );
         const wCounts = {};
         const mCounts = {};
+        const activeAshaIds = new Set();
+        
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
         allSubsSnap.forEach(d => {
           const data = d.data();
           const mod = data.moduleType || 'unknown';
           const asha = data.ashaId;
           wCounts[asha] = (wCounts[asha] || 0) + 1;
           mCounts[mod] = (mCounts[mod] || 0) + 1;
+          
+          if (data.submittedAt) {
+            const subTime = data.submittedAt.toDate ? data.submittedAt.toDate() : new Date(data.submittedAt);
+            if (subTime >= todayStart) {
+              activeAshaIds.add(asha);
+            }
+          }
         });
 
         if (!isUnmounted) {
           setStats({
             workerCount: ashaIds.length,
-            criticalCases: criticalSnap.size,
+            criticalCases: rCounts.CRITICAL || 0,
             totalFamilies: familiesSnap.size,
             activeToday: activeAshaIds.size,
             pendingReviews: pendingSnap.size

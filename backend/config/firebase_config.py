@@ -14,9 +14,16 @@ def initialize_firebase():
         secret_name = os.getenv("FIREBASE_SECRET_NAME", "firebase-service-account")
         
         try:
-            # Try to initialize via Application Default Credentials first (e.g. Cloud Run)
-            firebase_admin.initialize_app()
-            print("Firebase initialized with Application Default Credentials")
+            # Check for local service account file first
+            cred_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "firebase-service-account.json")
+            if os.path.exists(cred_path):
+                cred = credentials.Certificate(cred_path)
+                firebase_admin.initialize_app(cred)
+                print("Firebase initialized with explicit local credentials")
+            else:
+                # Try to initialize via Application Default Credentials first (e.g. Cloud Run)
+                firebase_admin.initialize_app()
+                print("Firebase initialized with Application Default Credentials")
         except ValueError:
             # Fall back to Secret Manager
             try:

@@ -44,6 +44,6 @@ jobs:
             --source . \
             --region asia-south1 \
             --allow-unauthenticated \
-            --project ashaai-prod \
+            --project ashaai-backend \
             --clear-vpc-connector \
             --env-vars-file=/tmp/env-vars.yaml

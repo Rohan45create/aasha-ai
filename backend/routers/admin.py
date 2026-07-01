@@ -5,7 +5,7 @@ import csv
 import io
 import json
 from fastapi.responses import StreamingResponse
-from google.cloud import firestore
+from firebase_admin import firestore
 import firebase_admin
 from firebase_admin import auth
 from middleware.auth_middleware import verify_firebase_token, require_role
@@ -76,7 +76,7 @@ async def translate_text(
 async def get_workers(head_id: str, user=Depends(verify_firebase_token)):
     """Get all ASHA workers under a supervisor."""
     try:
-        db = firestore.Client()
+        db = firestore.client()
         
         # Get head document
         head_doc = db.collection("asha_heads").document(head_id).get()
@@ -99,18 +99,22 @@ async def get_workers(head_id: str, user=Depends(verify_firebase_token)):
             if doc.exists:
                 data = doc.to_dict()
                 
-                # Get last activity
-                last_sub = list(db.collection("module_submissions")
-                    .where("ashaId", "==", asha_id)
-                    .order_by("submittedAt", direction=firestore.Query.DESCENDING)
-                    .limit(1).stream())
+                # Get submissions (fetch all to bypass composite index requirement)
+                all_subs = list(db.collection("module_submissions").where("ashaId", "==", asha_id).stream())
                 
-                # Get this month's submission count
-                month_start = datetime.now().replace(day=1, hour=0, minute=0, second=0)
-                month_count = len(list(db.collection("module_submissions")
-                    .where("ashaId", "==", asha_id)
-                    .where("submittedAt", ">=", month_start)
-                    .stream()))
+                from datetime import timezone
+                month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                
+                month_count = 0
+                last_sub_time = None
+                
+                for sub in all_subs:
+                    sub_time = sub.to_dict().get("submittedAt")
+                    if sub_time:
+                        if sub_time >= month_start:
+                            month_count += 1
+                        if last_sub_time is None or sub_time > last_sub_time:
+                            last_sub_time = sub_time
                 
                 workers_data.append({
                     "id": doc.id,
@@ -119,7 +123,7 @@ async def get_workers(head_id: str, user=Depends(verify_firebase_token)):
                     "phone": data.get("phone", ""),
                     "district": data.get("district", ""),
                     "isActive": data.get("isActive", True),
-                    "last_active": last_sub[0].to_dict().get("submittedAt") if last_sub else None,
+                    "last_active": last_sub_time,
                     "submissions_this_month": month_count,
                     "total_families": data.get("totalFamilies", 0),
                     "coverage_percent": data.get("coveragePercent", 0),
@@ -139,7 +143,7 @@ async def add_worker(
 ):
     import re
     import firebase_admin.auth as fb_auth
-    db_client = firestore.Client()
+    db_client = firestore.client()
 
     name = payload.get('name', '').strip()
     phone = re.sub(r'\D', '', payload.get('phone', ''))
@@ -212,7 +216,7 @@ async def create_pending_review(
 ):
     """Create a new pending review (e.g. for NGO referral)"""
     try:
-        db = firestore.Client()
+        db = firestore.client()
         db.collection("pending_reviews").add({
             "ashaId": user.get("uid"),
             "reviewStatus": "pending",
@@ -231,7 +235,7 @@ async def create_pending_review(
 async def approve_review(review_id: str, user=Depends(require_role("asha_head"))):
     """Approve a pending review."""
     try:
-        db = firestore.Client()
+        db = firestore.client()
         db.collection("pending_reviews").document(review_id).update({
             "reviewStatus": "approved",
             "reviewedBy": user["uid"],
@@ -261,7 +265,7 @@ async def reject_review(
 ):
     """Reject a pending review with reason."""
     try:
-        db = firestore.Client()
+        db = firestore.client()
         db.collection("pending_reviews").document(review_id).update({
             "reviewStatus": "rejected",
             "rejectionReason": reason,
@@ -298,7 +302,7 @@ async def reject_review(
 async def get_referrals(head_id: str, user=Depends(verify_firebase_token)):
     """Get all referrals for workers under a supervisor."""
     try:
-        db = firestore.Client()
+        db = firestore.client()
         head = db.collection("asha_heads").document(head_id).get().to_dict()
         if not head:
             return []
@@ -327,7 +331,7 @@ async def update_referral_status(
 ):
     """Update referral status."""
     try:
-        db = firestore.Client()
+        db = firestore.client()
         db.collection("referrals").document(referral_id).update({
             "status": status,
             "updatedAt": firestore.SERVER_TIMESTAMP,
@@ -352,7 +356,7 @@ async def publish_survey(
     """Publish a survey to assigned workers."""
     try:
         from vertexai.generative_models import GenerativeModel
-        db = firestore.Client()
+        db = firestore.client()
         
         VALID_ICONS = ["house", "person", "baby", "syringe", "heart", "stethoscope", "clipboard", "microscope",
                        "eye", "hand", "pill", "bandage", "pregnant", "elderly", "family", "village", "water",
@@ -407,7 +411,7 @@ shield, chart, leaf
 
 @router.get("/dashboard-stats")
 async def dashboard_stats(head_id: str, user=Depends(verify_firebase_token)):
-    db = firestore.Client()
+    db = firestore.client()
     head_doc = db.collection("asha_heads").document(head_id).get()
     asha_ids = head_doc.to_dict().get("ashaIds", []) if head_doc.exists else []
     
@@ -416,8 +420,8 @@ async def dashboard_stats(head_id: str, user=Depends(verify_firebase_token)):
     pending_syncs = 0
     active_today = 0
     
-    from datetime import datetime, timedelta
-    today_start = datetime.now().replace(hour=0,minute=0,second=0,microsecond=0)
+    from datetime import datetime, timezone
+    today_start = datetime.now(timezone.utc).replace(hour=0,minute=0,second=0,microsecond=0)
     
     for aid in asha_ids:
         fams = list(db.collection("households").where("ashaId","==",aid).stream())
@@ -426,8 +430,12 @@ async def dashboard_stats(head_id: str, user=Depends(verify_firebase_token)):
         crits = list(db.collection("children").where("ashaId","==",aid).where("riskLevel","==","CRITICAL").stream())
         critical_cases += len(crits)
         
-        recent = list(db.collection("module_submissions").where("ashaId","==",aid).where("submittedAt",">=",today_start).limit(1).stream())
-        if recent: active_today += 1
+        all_subs = db.collection("module_submissions").where("ashaId","==",aid).stream()
+        for sub in all_subs:
+            sub_time = sub.to_dict().get("submittedAt")
+            if sub_time and sub_time >= today_start:
+                active_today += 1
+                break
     
     return {
         "worker_count": len(asha_ids),
@@ -473,7 +481,7 @@ async def export_csv(report_type: str = "households"):
     writer = csv.writer(output)
     
     try:
-        db = firestore.Client()
+        db = firestore.client()
         if report_type == "households":
             docs = db.collection("households").stream()
             writer.writerow(["ID", "Village", "RationCardType", "GPS_Lat", "GPS_Lng", "CriticalCase"])

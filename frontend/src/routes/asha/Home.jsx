@@ -93,22 +93,29 @@ export default React.memo(function Home() {
     const todayStart = Timestamp.fromDate(new Date(new Date().setHours(0,0,0,0)));
     const monthStart = Timestamp.fromDate(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
-    // Listen to all submissions this month for stats
-    const qStats = query(
+    // Listen to ALL submissions for this ASHA (bypass composite index)
+    const qAll = query(
       collection(db, 'module_submissions'),
-      where('ashaId', '==', docId),
-      where('submittedAt', '>=', monthStart)
+      where('ashaId', '==', docId)
     );
 
-    const unsubStats = onSnapshot(qStats, (snap) => {
+    const unsubAll = onSnapshot(qAll, async (snap) => {
       let fToday=0, sToday=0, cToday=0;
       let fMonth=0, sMonth=0;
 
+      const submissions = [];
+
       snap.forEach(docSnap => {
         const data = docSnap.data();
-        sMonth++;
-        if (data.moduleType === 'family_survey') fMonth++;
+        submissions.push({ id: docSnap.id, ...data });
+        
+        // Month stats
+        if (data.submittedAt && data.submittedAt.toMillis() >= monthStart.toMillis()) {
+          sMonth++;
+          if (data.moduleType === 'family_survey') fMonth++;
+        }
 
+        // Today stats
         if (data.submittedAt && data.submittedAt.toMillis() >= todayStart.toMillis()) {
           sToday++;
           if (data.moduleType === 'family_survey') fToday++;
@@ -120,20 +127,16 @@ export default React.memo(function Home() {
         familiesToday: fToday, surveysToday: sToday, childrenToday: cToday,
         familiesMonth: fMonth, surveysMonth: sMonth
       });
-      setActivityLoading(false);
-    });
 
-    // Listen to recent 10 surveys
-    const qRecent = query(
-      collection(db, 'module_submissions'),
-      where('ashaId', '==', docId),
-      orderBy('submittedAt', 'desc'),
-      limit(10)
-    );
+      // Sort by submittedAt descending for recent surveys
+      submissions.sort((a, b) => {
+        const timeA = a.submittedAt ? a.submittedAt.toMillis() : 0;
+        const timeB = b.submittedAt ? b.submittedAt.toMillis() : 0;
+        return timeB - timeA;
+      });
 
-    const unsubRecent = onSnapshot(qRecent, async (snap) => {
-      const promises = snap.docs.map(async d => {
-        const sub = { id: d.id, ...d.data() };
+      const top10 = submissions.slice(0, 10);
+      const promises = top10.map(async sub => {
         if (sub.householdId) {
           try {
             const hdoc = await getDoc(doc(db, 'households', sub.householdId));
@@ -142,13 +145,18 @@ export default React.memo(function Home() {
         }
         return sub;
       });
+      
       const recents = await Promise.all(promises);
       setRecentSurveys(recents);
+      setActivityLoading(false);
+      
+    }, (error) => {
+      console.warn('[Home] Activity listener error:', error);
+      setActivityLoading(false);
     });
 
     return () => {
-      unsubStats();
-      unsubRecent();
+      unsubAll();
     };
   }, [docId]);
 

@@ -123,10 +123,11 @@ async def get_priority_list(asha_id: str, user=Depends(verify_firebase_token)):
     # We will fetch all and sort in mem to avoid immediate requirement of Firebase composite index 
     # during dev if we can't be sure it exists. But I'll follow user's code for order_by.
     try:
-        children = db.collection("children")\
+        children_generator = db.collection("children")\
             .where("ashaId", "==", asha_id)\
             .order_by("riskScore", direction=firestore.Query.DESCENDING)\
             .limit(20).stream()
+        children = list(children_generator)
     except Exception as e:
         # Fallback to in-mem sorting if index is missing
         logger.warning(f"Index might be missing: {e}. Falling back to standard check.")

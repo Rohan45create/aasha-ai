@@ -202,6 +202,17 @@ export default function BaseModuleForm({ title, moduleIcon, collectionName, fiel
           ashaId: resolvedAshaId,
           timestamp: serverTimestamp(),
         });
+        
+        // Log the module submission for Activity stats
+        await addDoc(collection(db, 'module_submissions'), {
+          ashaId: resolvedAshaId,
+          moduleType: moduleName || collectionName,
+          submittedAt: serverTimestamp(),
+          source: 'manual',
+          recordId: docRef.id,
+          householdId: formData.householdId || null,
+        });
+
         if (afterSubmit) {
           await afterSubmit(docRef.id, formData);
         }

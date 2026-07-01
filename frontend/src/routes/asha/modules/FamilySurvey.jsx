@@ -218,6 +218,21 @@ export default React.memo(function FamilySurvey() {
         }, ashaId);
       }
 
+      // Log the module submission for Activity stats
+      try {
+        const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+        const { db } = await import('../../../firebase');
+        await addDoc(collection(db, 'module_submissions'), {
+          ashaId,
+          moduleType: 'family_survey',
+          submittedAt: serverTimestamp(),
+          source: 'manual',
+          householdId,
+        });
+      } catch (e) {
+        console.error('Failed to log submission for activity:', e);
+      }
+
       showToast('Family Survey saved successfully!', 'success');
       setTimeout(() => navigate(-1), 1000);
     } catch (err) {
