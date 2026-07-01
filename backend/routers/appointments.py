@@ -73,7 +73,14 @@ async def get_upcoming_appointments(asha_id: str, user=Depends(verify_firebase_t
             .where("assignedAshaIds", "array_contains", asha_id) \
             .stream()
             
-        for doc in ngo_docs:
+        ngo_docs_all = db.collection("ngo_appointments") \
+            .where("assignedAshaIds", "array_contains", "all") \
+            .stream()
+            
+        all_ngo_docs = list(ngo_docs) + list(ngo_docs_all)
+        unique_docs = {doc.id: doc for doc in all_ngo_docs}.values()
+            
+        for doc in unique_docs:
             d = doc.to_dict()
             if d.get("scheduledDate", "") >= today and d.get("status") == "scheduled":
                 address = "Address not provided"

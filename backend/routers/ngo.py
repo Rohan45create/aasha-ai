@@ -302,8 +302,8 @@ async def book_appointment(payload: BookAppointmentPayload, decoded_token: dict 
     
     asha_ids = payload.assigned_asha_ids
     if asha_ids == ["all"]:
-        asha_docs = db.collection("ashas").where("supervisorId", "==", payload.head_id).stream()
-        asha_ids = [d.id for d in asha_docs]
+        # Keep as "all" so it renders correctly, we will fetch all workers for FCM later
+        pass
 
     ngo_doc = db.collection("ngos").document(payload.ngo_id).get()
     if not ngo_doc.exists:
@@ -368,7 +368,12 @@ async def book_appointment(payload: BookAppointmentPayload, decoded_token: dict 
     })
     
     # For FCM to ASHA workers
-    for asha_id in asha_ids:
+    notify_ids = asha_ids
+    if notify_ids == ["all"]:
+        asha_docs = db.collection("ashas").stream()
+        notify_ids = [d.id for d in asha_docs]
+
+    for asha_id in notify_ids:
         asha_doc = db.collection("ashas").document(asha_id).get()
         if asha_doc.exists:
             asha = asha_doc.to_dict()
@@ -472,10 +477,12 @@ async def get_ngo_appointments(ngo_id: str, decoded_token: dict = Depends(verify
     try:
         appts_query = db.collection("ngo_appointments") \
             .where("ngoId", "==", ngo_id) \
-            .order_by("scheduledDate", direction=firestore.Query.DESCENDING) \
             .stream()
             
         appts = [{"id": a.id, **a.to_dict()} for a in appts_query]
+        
+        # Sort in memory to avoid Firebase composite index requirement
+        appts.sort(key=lambda x: x.get("scheduledDate", ""), reverse=True)
         
         asha_cache = {}
         for appt in appts:
