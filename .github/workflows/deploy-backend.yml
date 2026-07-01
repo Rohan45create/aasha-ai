@@ -10,21 +10,23 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+# We need permissions to request the OIDC token
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+          workload_identity_provider: 'projects/853020519348/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider'
+          service_account: 'github-actions@ashaai-backend.iam.gserviceaccount.com'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
-
-      - name: Create Vertex AI Credentials
-        run: |
-          echo '${{ secrets.VERTEX_AI_CREDENTIALS_JSON }}' > backend/google-service-account.json
 
       - name: Deploy to Cloud Run
         env:
@@ -46,4 +48,5 @@ jobs:
             --allow-unauthenticated \
             --project ashaai-backend \
             --clear-vpc-connector \
+            --memory 1Gi \
             --env-vars-file=/tmp/env-vars.yaml

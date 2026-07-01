@@ -1,5 +1,5 @@
 {
   "projects": {
-    "default": "ashaai-prod"
+    "default": "ashaai-backend"
   }
 }
