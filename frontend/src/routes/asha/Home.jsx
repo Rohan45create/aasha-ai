@@ -115,6 +115,7 @@ export default React.memo(function Home() {
           if (data.moduleType === 'family_survey') fMonth++;
         }
 
+        
         // Today stats
         if (data.submittedAt && data.submittedAt.toMillis() >= todayStart.toMillis()) {
           sToday++;
