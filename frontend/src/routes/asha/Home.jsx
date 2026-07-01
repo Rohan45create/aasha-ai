@@ -102,6 +102,7 @@ export default React.memo(function Home() {
     const unsubAll = onSnapshot(qAll, async (snap) => {
       let fToday=0, sToday=0, cToday=0;
       let fMonth=0, sMonth=0;
+      console.log('Forcing Firebase deployment update v1');
 
       const submissions = [];
 
