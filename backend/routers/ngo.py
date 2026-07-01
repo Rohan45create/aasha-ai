@@ -426,7 +426,12 @@ async def update_appointment_date(appointment_id: str, payload: UpdateDatePayloa
     ngo = db.collection("ngos").document(appt["ngoId"]).get().to_dict()
     
     # Notify all assigned ASHA workers via FCM
-    for asha_id in appt.get("assignedAshaIds", []):
+    notify_ids = appt.get("assignedAshaIds", [])
+    if notify_ids == ["all"]:
+        asha_docs = db.collection("ashas").stream()
+        notify_ids = [d.id for d in asha_docs]
+        
+    for asha_id in notify_ids:
         asha = db.collection("ashas").document(asha_id).get().to_dict()
         if asha and asha.get("fcmToken"):
             try:
@@ -442,7 +447,7 @@ async def update_appointment_date(appointment_id: str, payload: UpdateDatePayloa
                 pass
                 
     # Create a notification doc for in-app display too (FCM might not reach all devices)
-    for asha_id in appt.get("assignedAshaIds", []):
+    for asha_id in notify_ids:
         db.collection("notifications").add({
             "userId": asha_id,
             "title": "NGO Visit Rescheduled",
